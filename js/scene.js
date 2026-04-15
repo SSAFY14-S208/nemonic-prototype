@@ -1,0 +1,210 @@
+// ===== 3D 씬 구성 =====
+class NemonicScene {
+    constructor() {
+        this.scene = new THREE.Scene();
+        this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        this.nemonicDevice = null;
+        this.controls = null;
+        this.raycaster = new THREE.Raycaster();
+        this.mouse = new THREE.Vector2();
+
+        this._setup();
+    }
+
+    _setup() {
+        // 렌더러
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.shadowMap.enabled = false;
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 1.5;
+        this.renderer.localClippingEnabled = true;
+        document.getElementById('canvas-container').appendChild(this.renderer.domElement);
+
+        // 배경 (진한 맑은 하늘)
+        this.scene.background = new THREE.Color(0x4DB8E8);
+        this.scene.fog = new THREE.Fog(0x4DB8E8, 30, 80);
+
+        // 조명
+        this._setupLights();
+
+        // 바닥
+        this._createFloor();
+
+        // 길
+        this._createPath();
+
+        // 네모닉 기기
+        this.nemonicDevice = new NemonicDevice();
+        this.nemonicDevice.group.position.set(0, 0, -5);
+        this.scene.add(this.nemonicDevice.group);
+
+        // 주변 장식
+        this._createDecorations();
+
+        // 카메라 초기 위치
+        this.camera.position.set(0, 2.5, 12);
+        this.camera.lookAt(0, 0.8, -5);
+
+        // OrbitControls (마우스 드래그로 시점 회전)
+        this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+        this.controls.target.set(0, 0.8, -5);
+        this.controls.enableDamping = true;
+        this.controls.dampingFactor = 0.08;
+        this.controls.enableZoom = true;
+        this.controls.minDistance = 3;
+        this.controls.maxDistance = 20;
+        this.controls.maxPolarAngle = Math.PI / 2.1; // 바닥 아래로 못 가게
+        this.controls.enabled = false; // 인트로 끝나면 활성화
+
+        // 리사이즈
+        window.addEventListener('resize', () => this._onResize());
+    }
+
+    _setupLights() {
+        // 앰비언트 (밝은 야외)
+        const ambient = new THREE.AmbientLight(0xffffff, 0.8);
+        this.scene.add(ambient);
+
+        // 메인 디렉셔널 (햇빛)
+        const dirLight = new THREE.DirectionalLight(0xfff5e6, 1.2);
+        dirLight.position.set(5, 10, 5);
+        dirLight.castShadow = false;
+        this.scene.add(dirLight);
+
+        // 네모닉 기기 스포트라이트
+        const spot = new THREE.SpotLight(0x64c8ff, 1.5, 15, Math.PI / 6, 0.5);
+        spot.position.set(0, 6, -3);
+        spot.target.position.set(0, 0, -5);
+        this.scene.add(spot);
+        this.scene.add(spot.target);
+
+        // 보조 포인트 라이트 (밝은 톤)
+        const fillLight = new THREE.PointLight(0xffffff, 0.3, 15);
+        fillLight.position.set(-3, 3, 0);
+        this.scene.add(fillLight);
+    }
+
+    _createFloor() {
+        // 잔디 바닥
+        const floorGeo = new THREE.PlaneGeometry(50, 50);
+        const floorMat = new THREE.MeshStandardMaterial({
+            color: 0x2E8B57,
+            roughness: 0.9,
+            metalness: 0.0
+        });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        this.scene.add(floor);
+    }
+
+    _createPath() {
+        // 밝은 돌길 (유저 → 네모닉)
+        const pathPoints = [];
+        for (let i = 0; i <= 20; i++) {
+            pathPoints.push(new THREE.Vector3(0, 0.02, 8 - i * 0.65));
+        }
+
+        for (let i = 0; i < pathPoints.length; i++) {
+            const tileGeo = new THREE.PlaneGeometry(0.8, 0.5);
+            const tileMat = new THREE.MeshStandardMaterial({
+                color: 0xC4A070,
+                roughness: 0.85,
+                metalness: 0.0
+            });
+            const tile = new THREE.Mesh(tileGeo, tileMat);
+            tile.rotation.x = -Math.PI / 2;
+            tile.position.copy(pathPoints[i]);
+            tile.name = `path-tile-${i}`;
+            this.scene.add(tile);
+        }
+    }
+
+    _createDecorations() {
+        // 구름 파티클 (하얀 점)
+        const particleCount = 100;
+        const positions = new Float32Array(particleCount * 3);
+        for (let i = 0; i < particleCount; i++) {
+            positions[i * 3] = (Math.random() - 0.5) * 40;
+            positions[i * 3 + 1] = Math.random() * 5 + 6;
+            positions[i * 3 + 2] = (Math.random() - 0.5) * 40 - 5;
+        }
+        const cloudGeo = new THREE.BufferGeometry();
+        cloudGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const cloudMat = new THREE.PointsMaterial({
+            color: 0xffffff,
+            size: 0.15,
+            transparent: true,
+            opacity: 0.5
+        });
+        this.stars = new THREE.Points(cloudGeo, cloudMat);
+        this.scene.add(this.stars);
+
+        // 양쪽 가로등 (테마파크 스타일)
+        for (let side = -1; side <= 1; side += 2) {
+            for (let i = 0; i < 5; i++) {
+                const poleGeo = new THREE.CylinderGeometry(0.06, 0.08, 2.5, 8);
+                const poleMat = new THREE.MeshStandardMaterial({
+                    color: 0x8B4513, roughness: 0.7, metalness: 0.2
+                });
+                const pole = new THREE.Mesh(poleGeo, poleMat);
+                pole.position.set(side * 2.5, 1.25, 6 - i * 3);
+                pole.castShadow = true;
+                this.scene.add(pole);
+
+                // 가로등 상단 구체 (밝은 파스텔)
+                const lampGeo = new THREE.SphereGeometry(0.15, 12, 12);
+                const lampMat = new THREE.MeshStandardMaterial({
+                    color: side > 0 ? 0xFFD700 : 0xFF9800,
+                    emissive: side > 0 ? 0xFFD700 : 0xFF9800,
+                    emissiveIntensity: 0.3,
+                    roughness: 0.4
+                });
+                const lamp = new THREE.Mesh(lampGeo, lampMat);
+                lamp.position.set(side * 2.5, 2.6, 6 - i * 3);
+                this.scene.add(lamp);
+            }
+        }
+
+        // 꽃 장식 (기기 주변에서 충분히 먼 곳에만)
+        const flowerColors = [0xFF69B4, 0xFFEB3B, 0xFF5722, 0x9C27B0, 0xE91E63];
+        for (let i = 0; i < 25; i++) {
+            const fGeo = new THREE.SphereGeometry(0.05, 6, 6);
+            const fMat = new THREE.MeshStandardMaterial({
+                color: flowerColors[Math.floor(Math.random() * flowerColors.length)],
+                roughness: 0.8
+            });
+            const flower = new THREE.Mesh(fGeo, fMat);
+            const fx = (Math.random() > 0.5 ? 1 : -1) * (3 + Math.random() * 7);
+            const fz = (Math.random() - 0.5) * 24;
+            flower.position.set(fx, 0.05, fz);
+            this.scene.add(flower);
+        }
+    }
+
+    // 별 애니메이션
+    animateStars(time) {
+        if (this.stars) {
+            const pos = this.stars.geometry.attributes.position;
+            for (let i = 0; i < pos.count; i++) {
+                pos.array[i * 3 + 1] += Math.sin(time * 0.5 + i) * 0.001;
+            }
+            pos.needsUpdate = true;
+        }
+    }
+
+    _onResize() {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    render() {
+        if (this.controls && this.controls.enabled) {
+            this.controls.update();
+        }
+        this.renderer.render(this.scene, this.camera);
+    }
+}

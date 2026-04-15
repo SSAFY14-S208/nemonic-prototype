@@ -1,0 +1,529 @@
+/* ===== 리셋 & 기본 ===== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    font-family: 'Segoe UI', 'Apple SD Gothic Neo', sans-serif;
+    background: #000;
+}
+
+#canvas-container {
+    width: 100%; height: 100%;
+    position: fixed; top: 0; left: 0;
+}
+
+.hidden { display: none !important; }
+
+/* ===== 로딩 화면 ===== */
+#loading-screen {
+    position: fixed; inset: 0;
+    background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000;
+    transition: opacity 0.8s ease;
+}
+#loading-screen.fade-out { opacity: 0; pointer-events: none; }
+
+.loading-content { text-align: center; }
+.loading-logo {
+    font-size: 3rem; font-weight: 800; color: #fff;
+    letter-spacing: 0.3em;
+    text-shadow: 0 0 30px rgba(100, 200, 255, 0.5);
+    margin-bottom: 2rem;
+    animation: logoPulse 2s ease-in-out infinite;
+}
+@keyframes logoPulse {
+    0%, 100% { text-shadow: 0 0 30px rgba(100,200,255,0.5); }
+    50% { text-shadow: 0 0 60px rgba(100,200,255,0.8), 0 0 100px rgba(100,200,255,0.3); }
+}
+.loading-bar-container {
+    width: 200px; height: 4px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px; margin: 0 auto 1rem;
+}
+.loading-bar {
+    width: 0%; height: 100%;
+    background: linear-gradient(90deg, #64c8ff, #a78bfa);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+.loading-text { color: rgba(255,255,255,0.5); font-size: 0.85rem; }
+
+/* ===== 스킵 버튼 ===== */
+#skip-btn {
+    position: fixed;
+    top: 24px; right: 24px;
+    z-index: 9999;
+    padding: 10px 24px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: rgba(255,255,255,0.7);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    transition: all 0.2s;
+}
+#skip-btn:hover {
+    background: rgba(255,255,255,0.2);
+    color: #fff;
+}
+
+/* ===== 스마트폰 오버레이 (Stage 1) ===== */
+#phone-overlay {
+    position: fixed; inset: 0;
+    display: flex; align-items: flex-end; justify-content: center;
+    padding-bottom: 5vh;
+    z-index: 100;
+    pointer-events: none;
+}
+.phone-frame {
+    width: 280px;
+    background: #1a1a1a;
+    border-radius: 30px;
+    padding: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+    pointer-events: auto;
+    transform: translateY(100px);
+    opacity: 0;
+}
+.phone-notch {
+    width: 80px; height: 6px;
+    background: #333; border-radius: 3px;
+    margin: 4px auto 8px;
+}
+.phone-screen {
+    background: #111827;
+    border-radius: 18px;
+    padding: 20px;
+    min-height: 160px;
+    display: flex; align-items: center; justify-content: center;
+}
+#phone-text {
+    color: #e0e7ff;
+    font-size: 0.95rem;
+    line-height: 1.7;
+    text-align: center;
+    min-height: 3em;
+}
+#phone-text .cursor {
+    display: inline-block;
+    width: 2px; height: 1em;
+    background: #64c8ff;
+    margin-left: 2px;
+    animation: blink 0.8s step-end infinite;
+    vertical-align: text-bottom;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+.phone-home {
+    width: 40px; height: 5px;
+    background: #444; border-radius: 3px;
+    margin: 8px auto 4px;
+}
+
+/* ===== 시작 버튼 ===== */
+#start-btn-container {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 110;
+}
+#start-btn {
+    padding: 16px 48px;
+    font-size: 1.2rem; font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border: none; border-radius: 50px;
+    cursor: pointer;
+    box-shadow: 0 8px 32px rgba(99,102,241,0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
+    animation: btnFloat 3s ease-in-out infinite;
+}
+#start-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 12px 40px rgba(99,102,241,0.6);
+}
+@keyframes btnFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+}
+
+/* ===== 드로잉 캔버스 (Stage 2) ===== */
+#drawing-overlay {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    z-index: 200;
+}
+.drawing-container {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 16px;
+}
+.drawing-header {
+    text-align: center;
+}
+.drawing-title {
+    color: #fff; font-size: 1.3rem; font-weight: 600;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+.memo-paper {
+    background: #fffde7;
+    padding: 16px;
+    box-shadow: 2px 4px 20px rgba(0,0,0,0.3),
+                inset 0 0 0 1px rgba(0,0,0,0.05);
+    position: relative;
+}
+.memo-paper::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 6px;
+    background: repeating-linear-gradient(90deg,
+        #ffd54f 0, #ffd54f 2px, transparent 2px, transparent 4px);
+}
+#drawing-canvas {
+    display: block;
+    cursor: crosshair;
+    background: #fffde7;
+    touch-action: none;
+}
+
+.drawing-tools {
+    display: flex; align-items: center; gap: 12px;
+    flex-wrap: wrap; justify-content: center;
+}
+.color-picker { display: flex; gap: 6px; }
+.color-swatch {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.2s, transform 0.2s;
+}
+.color-swatch.active { border-color: #fff; transform: scale(1.2); }
+.color-swatch:hover { transform: scale(1.15); }
+
+.brush-size { display: flex; align-items: center; gap: 6px; }
+#brush-size {
+    width: 80px;
+    accent-color: #8b5cf6;
+}
+
+.tool-btn {
+    padding: 8px 20px;
+    border: 1px solid rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.1);
+    color: #fff; border-radius: 8px;
+    cursor: pointer; font-size: 0.9rem;
+    transition: all 0.2s;
+}
+.tool-btn:hover { background: rgba(255,255,255,0.2); }
+.tool-btn.primary {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border: none;
+}
+.tool-btn.primary:hover {
+    background: linear-gradient(135deg, #7c7ff7, #a78bfa);
+}
+
+/* ===== 출력 상태 (Stage 3) ===== */
+#print-overlay {
+    position: fixed;
+    bottom: 10vh; left: 50%; transform: translateX(-50%);
+    z-index: 100;
+}
+.print-status {
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(17,24,39,0.9);
+    padding: 16px 28px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.1);
+    backdrop-filter: blur(10px);
+}
+.print-icon { font-size: 1.5rem; animation: printShake 0.3s infinite; }
+@keyframes printShake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-1px); }
+    75% { transform: translateX(1px); }
+}
+#print-text { color: #e0e7ff; font-size: 0.95rem; }
+
+/* ===== 점착 가이드 (Stage 4) ===== */
+#attach-guide {
+    position: fixed;
+    top: 8vh; left: 50%; transform: translateX(-50%);
+    z-index: 100;
+}
+.guide-text {
+    background: rgba(17,24,39,0.9);
+    color: #e0e7ff;
+    padding: 14px 28px;
+    border-radius: 12px;
+    font-size: 1rem;
+    border: 1px solid rgba(255,255,255,0.1);
+    animation: guideFloat 2s ease-in-out infinite;
+}
+@keyframes guideFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+
+/* ===== 화이트아웃 (Stage 5) ===== */
+#whiteout {
+    position: fixed; inset: 0;
+    background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 300;
+    opacity: 0;
+    transition: opacity 1.5s ease;
+}
+#whiteout.active { opacity: 1; }
+.whiteout-text {
+    font-size: 1.8rem; font-weight: 700;
+    color: #1a1a2e;
+    text-align: center;
+    opacity: 0;
+    transform: translateY(20px);
+}
+
+/* ===== 테마파크 UI (Stage 6) ===== */
+#themepark-ui {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 50;
+}
+
+#interaction-prompt {
+    position: fixed;
+    bottom: 20vh; left: 50%; transform: translateX(-50%);
+    background: rgba(17,24,39,0.9);
+    color: #e0e7ff;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-size: 1rem;
+    border: 1px solid rgba(99,102,241,0.4);
+    pointer-events: none;
+    animation: promptPulse 2s ease-in-out infinite;
+}
+.prompt-key {
+    display: inline-block;
+    background: rgba(99,102,241,0.3);
+    border: 1px solid rgba(99,102,241,0.6);
+    padding: 2px 10px;
+    border-radius: 6px;
+    font-weight: 700;
+    margin-right: 6px;
+}
+@keyframes promptPulse {
+    0%, 100% { border-color: rgba(99,102,241,0.4); }
+    50% { border-color: rgba(99,102,241,0.8); box-shadow: 0 0 20px rgba(99,102,241,0.2); }
+}
+
+/* 모바일 조이스틱 */
+#mobile-joystick {
+    position: fixed;
+    bottom: 80px; left: 60px;
+    pointer-events: auto;
+}
+.joystick-base {
+    width: 100px; height: 100px;
+    background: rgba(255,255,255,0.1);
+    border: 2px solid rgba(255,255,255,0.2);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+}
+.joystick-stick {
+    width: 40px; height: 40px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 50%;
+    transition: transform 0.1s;
+}
+
+/* 미니맵 */
+#minimap {
+    position: fixed;
+    top: 16px; right: 16px;
+    pointer-events: none;
+}
+#minimap-canvas {
+    border-radius: 12px;
+    border: 2px solid rgba(255,255,255,0.15);
+    background: rgba(17,24,39,0.8);
+}
+
+/* ===== 부스 오버레이 ===== */
+#booth-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 250;
+}
+.booth-content {
+    background: #1e1b4b;
+    border-radius: 20px;
+    width: 90%; max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    border: 1px solid rgba(99,102,241,0.3);
+}
+.booth-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+#booth-title {
+    color: #fff; font-size: 1.3rem; font-weight: 700;
+}
+.booth-close-btn {
+    width: 32px; height: 32px;
+    background: rgba(255,255,255,0.1);
+    border: none; border-radius: 50%;
+    color: #fff; font-size: 1.2rem;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s;
+}
+.booth-close-btn:hover { background: rgba(255,255,255,0.2); }
+#booth-body {
+    padding: 24px;
+    color: #c7d2fe;
+    line-height: 1.6;
+}
+#booth-body .booth-icon {
+    font-size: 3rem;
+    text-align: center;
+    margin-bottom: 16px;
+}
+#booth-body .booth-desc {
+    text-align: center;
+    margin-bottom: 20px;
+}
+#booth-body .booth-action-btn {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border: none; border-radius: 12px;
+    color: #fff; font-size: 1rem; font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+#booth-body .booth-action-btn:hover { opacity: 0.9; }
+
+/* ===== 양세찬 게임 ===== */
+.yang-game { text-align: center; }
+.yang-header { margin-bottom: 20px; }
+.yang-emoji { font-size: 2.5rem; margin-bottom: 6px; }
+.yang-title-text { font-size: 1.4rem; font-weight: 800; color: #fff; margin-bottom: 6px; }
+.yang-subtitle { font-size: 0.8rem; color: #a5b4fc; line-height: 1.5; }
+.yang-section-label {
+    font-size: 0.75rem; color: #8b9cf7; text-align: left;
+    margin: 16px 0 8px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;
+}
+.yang-categories { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.yang-cat-btn {
+    flex: 1 1 calc(50% - 8px); padding: 10px 8px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+    color: #c7d2fe; border-radius: 10px; cursor: pointer;
+    font-size: 0.85rem; transition: all 0.2s;
+}
+.yang-cat-btn:hover { background: rgba(255,255,255,0.12); }
+.yang-cat-btn.active {
+    background: rgba(99,102,241,0.3); border-color: #6366f1; color: #fff;
+}
+.yang-difficulty, .yang-count { display: flex; gap: 8px; margin-bottom: 4px; }
+.yang-diff-btn, .yang-count-btn {
+    flex: 1; padding: 8px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+    color: #c7d2fe; border-radius: 8px; cursor: pointer; font-size: 0.82rem;
+    transition: all 0.2s;
+}
+.yang-diff-btn:hover, .yang-count-btn:hover { background: rgba(255,255,255,0.12); }
+.yang-diff-btn.active, .yang-count-btn.active {
+    background: rgba(99,102,241,0.3); border-color: #6366f1; color: #fff;
+}
+.yang-start-btn {
+    width: 100%; margin-top: 18px; padding: 14px;
+    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+    border: none; border-radius: 12px; color: #fff;
+    font-size: 1.05rem; font-weight: 700; cursor: pointer;
+    transition: opacity 0.2s;
+}
+.yang-start-btn:hover { opacity: 0.9; }
+
+/* 플레이 화면 */
+.yang-play-header {
+    display: flex; justify-content: center; gap: 12px;
+    margin-bottom: 16px; flex-wrap: wrap;
+}
+.yang-play-cat, .yang-play-diff, .yang-play-count {
+    background: rgba(255,255,255,0.08); padding: 4px 12px;
+    border-radius: 20px; font-size: 0.8rem; color: #c7d2fe;
+}
+.yang-memo-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px; margin-bottom: 16px;
+}
+.yang-memo-card {
+    position: relative; aspect-ratio: 3/4;
+    perspective: 800px; cursor: pointer;
+}
+.yang-memo-front, .yang-memo-back {
+    position: absolute; inset: 0;
+    border-radius: 10px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    backface-visibility: hidden; transition: transform 0.5s;
+    padding: 8px;
+}
+.yang-memo-front {
+    background: linear-gradient(135deg, #ffd54f, #ffb300);
+    color: #5d4037; transform: rotateY(0deg);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+}
+.yang-memo-back {
+    background: #fffde7; color: #333;
+    transform: rotateY(180deg);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+    border: 2px solid #ffd54f;
+}
+.yang-memo-card.revealed .yang-memo-front { transform: rotateY(-180deg); }
+.yang-memo-card.revealed .yang-memo-back { transform: rotateY(0deg); }
+.yang-memo-number { font-size: 0.7rem; font-weight: 700; opacity: 0.6; margin-bottom: 4px; }
+.yang-memo-q { font-size: 2rem; font-weight: 800; }
+.yang-memo-tap { font-size: 0.65rem; margin-top: 8px; opacity: 0.7; }
+.yang-memo-word { font-size: 1.1rem; font-weight: 800; text-align: center; word-break: keep-all; }
+
+.yang-actions { display: flex; gap: 8px; }
+.yang-reset-btn, .yang-back-btn {
+    flex: 1; padding: 10px;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+    color: #c7d2fe; border-radius: 10px; cursor: pointer; font-size: 0.85rem;
+    transition: all 0.2s;
+}
+.yang-reset-btn:hover, .yang-back-btn:hover { background: rgba(255,255,255,0.15); }
+
+.yang-complete {
+    margin-top: 16px; padding: 16px;
+    background: rgba(99,102,241,0.15); border-radius: 12px;
+    border: 1px solid rgba(99,102,241,0.3);
+}
+.yang-complete-text { color: #fff; font-size: 1rem; font-weight: 700; margin-bottom: 12px; }
+.yang-again-btn {
+    padding: 10px 32px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border: none; border-radius: 10px; color: #fff;
+    font-size: 0.9rem; font-weight: 600; cursor: pointer;
+}
+
+/* ===== 반응형 ===== */
+@media (max-width: 500px) {
+    .phone-frame { width: 240px; }
+    #drawing-canvas { width: 300px; height: 300px; }
+    .drawing-title { font-size: 1.1rem; }
+    .whiteout-text { font-size: 1.3rem; padding: 0 20px; }
+    #mobile-joystick { display: block !important; }
+}

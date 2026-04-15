@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Nemonic Tour - 네모닉 투어</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Three.js 렌더러 컨테이너 -->
+    <div id="canvas-container"></div>
+
+    <!-- 로딩 화면 -->
+    <div id="loading-screen">
+        <div class="loading-content">
+            <div class="loading-logo">NEMONIC</div>
+            <div class="loading-bar-container">
+                <div class="loading-bar"></div>
+            </div>
+            <div class="loading-text">로딩 중...</div>
+        </div>
+    </div>
+
+    <!-- 스킵 버튼 -->
+    <button id="skip-btn" class="hidden">SKIP ▸▸</button>
+
+    <!-- 스마트폰 안내 오버레이 (Stage 1) -->
+    <div id="phone-overlay" class="hidden">
+        <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+                <div id="phone-text"></div>
+            </div>
+            <div class="phone-home"></div>
+        </div>
+    </div>
+
+    <!-- 시작하기 버튼 -->
+    <div id="start-btn-container" class="hidden">
+        <button id="start-btn">나만의 문 그리기</button>
+    </div>
+
+    <!-- 드로잉 캔버스 (Stage 2) -->
+    <div id="drawing-overlay" class="hidden">
+        <div class="drawing-container">
+            <div class="drawing-header">
+                <span class="drawing-title">나만의 문을 그려주세요</span>
+            </div>
+            <div class="memo-paper">
+                <canvas id="drawing-canvas" width="400" height="400"></canvas>
+            </div>
+            <div class="drawing-tools">
+                <div class="color-picker">
+                    <div class="color-swatch active" data-color="#333333" style="background:#333333"></div>
+                    <div class="color-swatch" data-color="#E74C3C" style="background:#E74C3C"></div>
+                    <div class="color-swatch" data-color="#3498DB" style="background:#3498DB"></div>
+                    <div class="color-swatch" data-color="#2ECC71" style="background:#2ECC71"></div>
+                    <div class="color-swatch" data-color="#F39C12" style="background:#F39C12"></div>
+                    <div class="color-swatch" data-color="#9B59B6" style="background:#9B59B6"></div>
+                </div>
+                <div class="brush-size">
+                    <input type="range" id="brush-size" min="2" max="20" value="5">
+                </div>
+                <button id="clear-drawing" class="tool-btn">지우기</button>
+                <button id="done-drawing" class="tool-btn primary">완료</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 출력 안내 (Stage 3) -->
+    <div id="print-overlay" class="hidden">
+        <div class="print-status">
+            <div class="print-icon">🖨️</div>
+            <div id="print-text">메모를 출력하고 있습니다...</div>
+        </div>
+    </div>
+
+    <!-- 점착 안내 (Stage 4) -->
+    <div id="attach-guide" class="hidden">
+        <div class="guide-text">메모를 드래그하여 네모닉 벽면에 붙여주세요</div>
+    </div>
+
+    <!-- 화이트아웃 전환 (Stage 5) -->
+    <div id="whiteout" class="hidden">
+        <div class="whiteout-text">네모닉 월드에 오신 것을 환영합니다</div>
+    </div>
+
+    <!-- 테마파크 UI (Stage 6) -->
+    <div id="themepark-ui" class="hidden">
+        <div id="interaction-prompt" class="hidden">
+            <span class="prompt-key">E</span> 체험하기
+        </div>
+        <div id="mobile-joystick" class="hidden">
+            <div class="joystick-base">
+                <div class="joystick-stick"></div>
+            </div>
+        </div>
+        <div id="minimap">
+            <canvas id="minimap-canvas" width="150" height="150"></canvas>
+        </div>
+    </div>
+
+    <!-- 부스 UI 오버레이 -->
+    <div id="booth-overlay" class="hidden">
+        <div class="booth-content">
+            <div class="booth-header">
+                <span id="booth-title">부스 이름</span>
+                <button id="booth-close" class="booth-close-btn">&times;</button>
+            </div>
+            <div id="booth-body">
+                <!-- 부스별 콘텐츠 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+    <!-- App Modules -->
+    <script src="js/utils.js"></script>
+    <script src="js/nemonic-device.js"></script>
+    <script src="js/scene.js"></script>
+    <script src="js/stages/stage1-intro.js"></script>
+    <script src="js/stages/stage2-drawing.js"></script>
+    <script src="js/stages/stage3-print.js"></script>
+    <script src="js/stages/stage4-attach.js"></script>
+    <script src="js/stages/stage5-enter.js"></script>
+    <script src="js/character.js"></script>
+    <script src="js/games/yanggame.js"></script>
+    <script src="js/themepark.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
