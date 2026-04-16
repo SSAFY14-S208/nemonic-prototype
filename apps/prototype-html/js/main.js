@@ -14,7 +14,7 @@ class NemonicTourApp {
 
     async _init() {
         this.nemonicScene = new NemonicScene();
-        await this._fakeLoading();
+        this._hideLoadingScreen();
         this._animate();
         this._setupSkipButton();
         this._runStages();
@@ -24,25 +24,23 @@ class NemonicTourApp {
         Utils.show('skip-btn');
         document.getElementById('skip-btn').addEventListener('click', () => {
             if (this.isThemeParkMode) return;
-            // 먼저 테마파크 시작 (isThemeParkMode = true로 설정됨)
-            this._startThemePark();
-            // 그 다음 UI 정리 & GSAP kill
-            ['phone-overlay', 'start-btn-container', 'drawing-overlay',
-             'print-overlay', 'attach-guide', 'whiteout', 'skip-btn'].forEach(id => Utils.hide(id));
+            // 먼저 기존 인트로 연출만 정리
             gsap.globalTimeline.clear();
+            ['phone-overlay', 'start-btn-container', 'drawing-overlay',
+             'print-overlay', 'attach-guide', 'vortex-transition', 'skip-btn'].forEach(id => Utils.hide(id));
+            const whiteout = document.getElementById('whiteout');
+            whiteout.classList.add('hidden');
+            whiteout.style.opacity = '0';
+
+            // 그 다음 테마파크 시작
+            this._startThemePark();
         });
     }
 
-    async _fakeLoading() {
-        const bar = document.querySelector('.loading-bar');
-        for (let i = 0; i <= 100; i += 5) {
-            bar.style.width = i + '%';
-            await Utils.delay(50);
-        }
-        await Utils.delay(300);
-        document.getElementById('loading-screen').classList.add('fade-out');
-        await Utils.delay(800);
-        document.getElementById('loading-screen').classList.add('hidden');
+    _hideLoadingScreen() {
+        const loading = document.getElementById('loading-screen');
+        if (!loading) return;
+        loading.classList.add('hidden');
     }
 
     async _runStages() {
@@ -122,12 +120,8 @@ class NemonicTourApp {
 
         } catch(e) { console.error('THEMEPARK INIT ERROR:', e); }
 
-        // 충돌 박스 전달
-        this.character.collisionBoxes = this.themePark.booths.map(b => {
-            const p = b.data.position;
-            const hs = 1.9; // 방 크기의 절반
-            return { minX: p.x - hs, maxX: p.x + hs, minZ: p.z - hs, maxZ: p.z + hs };
-        });
+        // 부스는 이제 이미지 팝업만 하므로 이동 충돌은 두지 않음
+        this.character.collisionBoxes = [];
 
         // UI
         Utils.show('themepark-ui');

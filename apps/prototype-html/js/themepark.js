@@ -151,9 +151,9 @@ class ThemePark {
         boothData.forEach(data => {
             const { shell, interior } = this._buildRoom(data);
             shell.visible = false;
-            interior.visible = false;
-            interior.scale.set(0, 0, 0);
-            this.booths.push({ mesh: shell, interior, data, state: 'flat', springT: 0 });
+            interior.visible = true;
+            interior.scale.set(1, 1, 1);
+            this.booths.push({ mesh: shell, interior, data, state: 'full', springT: 1 });
         });
     }
 
@@ -186,8 +186,8 @@ class ThemePark {
     _getPreviewTexture(path) {
         if (!path) return null;
         if (!this._previewTextureCache.has(path)) {
-            const tex = this.textureLoader.load(encodeURI(path));
-            tex.colorSpace = THREE.SRGBColorSpace;
+            const tex = this.textureLoader.load(path);
+            tex.encoding = THREE.sRGBEncoding;
             tex.anisotropy = 4;
             this._previewTextureCache.set(path, tex);
         }
@@ -197,7 +197,6 @@ class ThemePark {
     _createPreviewPlane(path, width, height, options = {}) {
         const group = new THREE.Group();
         const texture = this._getPreviewTexture(path);
-        const frameColor = options.frameColor || 0xffffff;
 
         const shadow = new THREE.Mesh(
             new THREE.PlaneGeometry(width * 0.92, height * 0.86),
@@ -210,24 +209,16 @@ class ThemePark {
         shadow.position.set(0.08, -0.08, -0.02);
         group.add(shadow);
 
-        const frame = new THREE.Mesh(
-            new THREE.BoxGeometry(width + 0.14, height + 0.14, 0.06),
-            new THREE.MeshStandardMaterial({
-                color: frameColor,
-                roughness: 0.5,
-                metalness: 0.02
-            })
-        );
-        group.add(frame);
-
         const image = new THREE.Mesh(
             new THREE.PlaneGeometry(width, height),
             new THREE.MeshBasicMaterial({
                 map: texture,
-                transparent: true
+                color: 0xffffff,
+                transparent: true,
+                side: THREE.DoubleSide
             })
         );
-        image.position.z = 0.04;
+        image.position.z = 0.01;
         group.add(image);
 
         group.position.set(0, options.y || 0, options.z || 0);
@@ -627,23 +618,6 @@ class ThemePark {
         this.booths.forEach(booth => {
             const dist = characterPos.distanceTo(booth.data.position);
             if (dist < nearestDist) { nearestDist = dist; nearest = booth; }
-
-            // 2D→3D 뿅 전환 (한번만, 되돌아가지 않음)
-            const trigger = 7;
-            if (dist < trigger && booth.state === 'flat') {
-                booth.state = 'popping';
-                booth.springT = 0;
-                booth.interior.visible = true;
-                booth.interior.scale.set(0.01, 0.01, 0.01);
-            }
-            if (booth.state === 'popping') {
-                booth.springT += 0.035;
-                const t = Math.min(booth.springT, 1);
-                const e = 1 - Math.pow(1-t, 3) * Math.cos(t * Math.PI * 2);
-                const s = Math.max(0.02, e);
-                booth.interior.scale.set(s, s, s);
-                if (t >= 1) booth.state = 'full';
-            }
             if (booth.state === 'full') {
                 const idle = 1 + Math.sin(Date.now() * 0.002) * 0.006;
                 booth.interior.scale.set(idle, idle, idle);

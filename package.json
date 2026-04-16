@@ -1,0 +1,9 @@
+{
+  "name": "nemonic-prototype-workspace",
+  "private": true,
+  "scripts": {
+    "html": "cd apps/prototype-html && python3 -m http.server 4173",
+    "portfolio:install": "cd apps/prototype-next && npm install",
+    "portfolio:dev": "cd apps/prototype-next && npm run dev"
+  }
+}

@@ -59,11 +59,11 @@ class NemonicDevice {
 
         // === 상단 용지 출력 슬릿 (앞쪽에 위치) ===
         const topY = bodyH + 0.015;
-        const slitGeo = new THREE.BoxGeometry(bodyW * 0.34, 0.003, 0.018);
+        const slitGeo = new THREE.BoxGeometry(bodyW * 0.48, 0.003, 0.022);
         const slitMat = new THREE.MeshStandardMaterial({ color: 0x7a7c7f, roughness: 0.48, metalness: 0.22 });
         this.paperSlot = new THREE.Mesh(slitGeo, slitMat);
         this.paperSlot.rotation.y = 0;
-        this.paperSlot.position.set(bodyW * 0.08, topY, bodyD * 0.14);
+        this.paperSlot.position.set(bodyW * 0.04, topY, bodyD * 0.14);
         this.group.add(this.paperSlot);
         this._slotStart = this.paperSlot.position.clone();
         this._slotRotationY = this.paperSlot.rotation.y;

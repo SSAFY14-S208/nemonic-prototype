@@ -9,70 +9,54 @@ class Stage5Enter {
         const camera = this.scene.camera;
         const portal = this.app._portalTarget || this.app._doorPos || { x: 0, y: 0.525, z: -4.25 };
         const doorCenter = new THREE.Vector3(portal.x, portal.y, portal.z);
-        const vortexTransition = document.getElementById('vortex-transition');
-        const vortexInner = vortexTransition.querySelector('.vortex-transition-inner');
+        const startPos = camera.position.clone();
+        const travelDir = new THREE.Vector3().subVectors(doorCenter, startPos).normalize();
+        const enterPoint = doorCenter.clone().add(travelDir.clone().multiplyScalar(0.28));
+        const insidePoint = doorCenter.clone().add(travelDir.clone().multiplyScalar(1.15));
 
-        // 전환 오버레이 준비
         const whiteout = document.getElementById('whiteout');
         whiteout.style.background = '#ffffff';
         whiteout.classList.remove('hidden');
         whiteout.style.opacity = '0';
-        vortexTransition.classList.remove('hidden');
-        vortexTransition.style.opacity = '0';
-        vortexInner.style.left = '50%';
-        vortexInner.style.top = '50%';
-        vortexInner.style.transform = 'translate(-50%, -50%) scale(0.12)';
-        vortexInner.style.rotate = '0deg';
 
         // 슈우웅 소리
         this._playVortexSound();
 
-        // 먼저 문 안쪽으로 빨려 들어가는 느낌을 만든 뒤,
-        // 그 위치에서 소용돌이가 화면 전체를 덮게 한다.
+        // 문 안 소용돌이로 실제로 빨려 들어가며 점점 커 보이게 한다.
         await new Promise(resolve => {
             const tl = gsap.timeline({ onComplete: resolve });
             tl.to(camera.position, {
-                duration: 0.44,
-                x: doorCenter.x * 0.55,
-                y: doorCenter.y * 0.72,
-                z: camera.position.z - 1.15,
+                duration: 0.48,
+                x: enterPoint.x,
+                y: enterPoint.y,
+                z: enterPoint.z,
                 ease: 'power2.in',
                 onUpdate: () => {
                     camera.lookAt(doorCenter.x, doorCenter.y, doorCenter.z);
                 }
             }, 0)
+            .to(camera.position, {
+                duration: 0.42,
+                x: insidePoint.x,
+                y: insidePoint.y,
+                z: insidePoint.z,
+                ease: 'power4.in',
+                onUpdate: () => {
+                    const lookAhead = insidePoint.clone().add(travelDir.clone().multiplyScalar(1.8));
+                    camera.lookAt(lookAhead.x, lookAhead.y, lookAhead.z);
+                }
+            }, 0.48)
             .to(camera, {
-                duration: 0.44,
-                fov: 56,
-                ease: 'power2.in',
+                duration: 0.9,
+                fov: 28,
+                ease: 'power3.in',
                 onUpdate: () => camera.updateProjectionMatrix()
             }, 0)
-            .add(() => {
-                const projected = doorCenter.clone().project(camera);
-                const startX = ((projected.x + 1) * 0.5) * window.innerWidth;
-                const startY = ((1 - projected.y) * 0.5) * window.innerHeight;
-                vortexInner.style.left = `${startX}px`;
-                vortexInner.style.top = `${startY}px`;
-                vortexInner.style.transform = 'translate(-50%, -50%) scale(0.26)';
-            })
-            .to(vortexTransition, {
+            .to(whiteout, {
                 duration: 0.12,
                 opacity: 1,
-                ease: 'power1.out'
-            })
-            .to(vortexInner, {
-                duration: 0.72,
-                left: window.innerWidth * 0.5,
-                top: window.innerHeight * 0.5,
-                scale: 8.5,
-                rotate: 260,
-                ease: 'power4.in'
-            }, '<')
-            .to(whiteout, {
-                duration: 0.18,
-                opacity: 1,
                 ease: 'power2.inOut'
-            }, '-=0.08');
+            }, 0.82);
         });
 
         // 테마파크로 전환
@@ -82,10 +66,6 @@ class Stage5Enter {
         if (this.app._stage4) {
             this.app._stage4.stopEffects();
         }
-        Utils.hide('vortex-transition');
-        vortexInner.style.left = '50%';
-        vortexInner.style.top = '50%';
-        vortexInner.style.transform = 'translate(-50%, -50%) scale(0.2)';
     }
 
     _playVortexSound() {

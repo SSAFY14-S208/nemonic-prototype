@@ -87,6 +87,30 @@ class Stage4Attach {
 
                 const visited = new Uint8Array(W * H);
                 const components = [];
+                const analyzePixels = (pixels) => {
+                    if (!pixels || !pixels.length) return null;
+                    let cMinX = W, cMinY = H, cMaxX = 0, cMaxY = 0, sumX = 0, sumY = 0;
+                    pixels.forEach((idx) => {
+                        const x = idx % W;
+                        const y = (idx - x) / W;
+                        if (x < cMinX) cMinX = x;
+                        if (x > cMaxX) cMaxX = x;
+                        if (y < cMinY) cMinY = y;
+                        if (y > cMaxY) cMaxY = y;
+                        sumX += x;
+                        sumY += y;
+                    });
+                    return {
+                        pixels,
+                        minX: cMinX,
+                        minY: cMinY,
+                        maxX: cMaxX,
+                        maxY: cMaxY,
+                        cx: sumX / pixels.length,
+                        cy: sumY / pixels.length,
+                        area: pixels.length
+                    };
+                };
                 for (let i = 0; i < W * H; i++) {
                     if (!inside[i] || visited[i]) continue;
                     const pixels = [];
@@ -119,17 +143,48 @@ class Stage4Attach {
                     });
                 }
 
-                const sortedByX = components.slice().sort((a, b) => a.cx - b.cx);
-                const portalComponent = sortedByX[0] || null;
-                const doorComponent = sortedByX[sortedByX.length - 1] || portalComponent;
+                const significant = components.filter((component) => component.area > Math.max(60, W * H * 0.002));
+                const sortedByX = (significant.length ? significant : components).slice().sort((a, b) => a.cx - b.cx);
+                const doorSeed = sortedByX[sortedByX.length - 1] || null;
+
+                let splitX = doorSeed
+                    ? doorSeed.minX + (doorSeed.maxX - doorSeed.minX) * 0.12
+                    : (minX + maxX) * 0.58;
+                splitX = Math.max(minX + 2, Math.min(maxX - 2, splitX));
+
+                let portalPixels = [];
+                let doorPixels = [];
+                for (let i = 0; i < W * H; i++) {
+                    if (!inside[i]) continue;
+                    const x = i % W;
+                    if (x < splitX) portalPixels.push(i);
+                    else doorPixels.push(i);
+                }
+
+                if (!portalPixels.length || !doorPixels.length) {
+                    portalPixels = [];
+                    doorPixels = [];
+                    const fallbackSplit = (minX + maxX) / 2;
+                    for (let i = 0; i < W * H; i++) {
+                        if (!inside[i]) continue;
+                        const x = i % W;
+                        if (x < fallbackSplit) portalPixels.push(i);
+                        else doorPixels.push(i);
+                    }
+                }
+
+                const portalComponent = analyzePixels(portalPixels) || sortedByX[0] || null;
+                const doorComponent = analyzePixels(doorPixels) || doorSeed || portalComponent;
 
                 const dp = this._doorPos;
                 const memoW = 0.85 * memo.scale.x;
                 const memoH = 0.85 * memo.scale.y;
+                const centerX = (minX + maxX) / 2;
+                const centerY = (minY + maxY) / 2;
                 const activePortal = portalComponent || doorComponent;
                 const bounds = {
-                    cx: (activePortal.minX + activePortal.maxX) / 2 / W,
-                    cy: (activePortal.minY + activePortal.maxY) / 2 / H,
+                    cx: centerX / W,
+                    cy: centerY / H,
                     w: Math.max((activePortal.maxX - activePortal.minX) / W, 0.05),
                     h: Math.max((activePortal.maxY - activePortal.minY) / H, 0.05),
                     left: (doorComponent ? doorComponent.minX : minX) / W,
@@ -137,7 +192,7 @@ class Stage4Attach {
                 };
                 bounds.portalWorldX = dp.x + (bounds.cx - 0.5) * memoW;
                 bounds.portalWorldY = dp.y - (bounds.cy - 0.5) * memoH;
-                bounds.portalWorldZ = dp.z - 0.09;
+                bounds.portalWorldZ = dp.z + 0.001;
 
                 const makeMaskCanvas = (component) => {
                     const canvas = document.createElement('canvas');
@@ -277,18 +332,21 @@ class Stage4Attach {
             this._vortexLayers.push(info);
             this._paintVortexLayer(info, 0);
 
-            const mesh = new THREE.Mesh(
-                new THREE.PlaneGeometry(memoW, memoH),
-                new THREE.MeshBasicMaterial({
-                    map: texture,
-                    alphaMap: maskTex,
-                    transparent: true,
-                    depthWrite: false,
-                    side: THREE.DoubleSide,
-                    opacity: layer === 0 ? 1 : 0.74 - layer * 0.12
-                })
-            );
-            mesh.position.set(dp.x, dp.y, dp.z - 0.08 - layer * 0.008);
+                const mesh = new THREE.Mesh(
+                    new THREE.PlaneGeometry(memoW, memoH),
+                    new THREE.MeshBasicMaterial({
+                        map: texture,
+                        alphaMap: maskTex,
+                        transparent: true,
+                        depthWrite: false,
+                        polygonOffset: true,
+                        polygonOffsetFactor: 1,
+                        polygonOffsetUnits: 1,
+                        side: THREE.DoubleSide,
+                        opacity: layer === 0 ? 1 : 0.74 - layer * 0.12
+                    })
+                );
+            mesh.position.set(dp.x, dp.y, dp.z + 0.001 - layer * 0.0015);
             this.scene.scene.add(mesh);
             layers.push(mesh);
         }
@@ -301,46 +359,56 @@ class Stage4Attach {
         const { ctx, canvas, radius, layer, texture, cx, cy } = layerInfo;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        const bg = ctx.createRadialGradient(cx, cy, 6, cx, cy, radius);
-        bg.addColorStop(0, 'rgba(255,255,255,1)');
-        bg.addColorStop(0.16, 'rgba(214,240,255,0.98)');
-        bg.addColorStop(0.45, 'rgba(110,190,250,0.96)');
-        bg.addColorStop(0.8, 'rgba(34,127,220,0.92)');
-        bg.addColorStop(1, 'rgba(17,90,173,0.85)');
+        const bg = ctx.createRadialGradient(cx, cy, radius * 0.04, cx, cy, radius);
+        bg.addColorStop(0, 'rgba(8,6,34,1)');
+        bg.addColorStop(0.15, 'rgba(28,18,82,0.98)');
+        bg.addColorStop(0.34, 'rgba(73,48,151,0.96)');
+        bg.addColorStop(0.62, 'rgba(109,82,205,0.92)');
+        bg.addColorStop(0.86, 'rgba(71,111,223,0.76)');
+        bg.addColorStop(1, 'rgba(28,84,189,0.28)');
         ctx.fillStyle = bg;
         ctx.beginPath();
         ctx.arc(cx, cy, radius, 0, Math.PI * 2);
         ctx.fill();
 
-        const arms = 7;
-        const offsetSpin = time * (0.55 + layer * 0.16) * (layer % 2 === 0 ? 1 : -1);
+        const arms = 8;
+        const offsetSpin = time * (0.72 + layer * 0.18) * (layer % 2 === 0 ? 1 : -1);
         for (let arm = 0; arm < arms; arm++) {
             const offset = (arm / arms) * Math.PI * 2 + offsetSpin + layer * 0.12;
             ctx.beginPath();
             for (let t = 0; t <= 1; t += 0.003) {
-                const angle = offset + t * Math.PI * (5.1 + layer * 0.22);
-                const r = 2 + t * radius;
+                const angle = offset + t * Math.PI * (5.7 + layer * 0.24);
+                const r = 2 + Math.pow(t, 0.88) * radius;
                 const x = cx + Math.cos(angle) * r;
                 const y = cy + Math.sin(angle) * r;
                 if (t === 0) ctx.moveTo(x, y);
                 else ctx.lineTo(x, y);
             }
             ctx.strokeStyle = layer % 2 === 0
-                ? `rgba(255,255,255,${0.93 - layer * 0.12})`
-                : `rgba(51,145,228,${0.88 - layer * 0.11})`;
-            ctx.lineWidth = 26 - layer * 3;
+                ? `rgba(237,228,255,${0.88 - layer * 0.11})`
+                : `rgba(121,165,255,${0.72 - layer * 0.09})`;
+            ctx.lineWidth = 22 - layer * 2.5;
             ctx.lineCap = 'round';
             ctx.stroke();
         }
 
-        const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius * 0.82);
-        glow.addColorStop(0, 'rgba(255,255,255,0.98)');
-        glow.addColorStop(0.35, 'rgba(189,232,255,0.9)');
-        glow.addColorStop(0.7, 'rgba(67,157,235,0.3)');
-        glow.addColorStop(1, 'rgba(67,157,235,0)');
-        ctx.fillStyle = glow;
+        const innerGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius * 0.5);
+        innerGlow.addColorStop(0, 'rgba(255,255,255,0.08)');
+        innerGlow.addColorStop(0.35, 'rgba(177,150,255,0.22)');
+        innerGlow.addColorStop(0.75, 'rgba(58,36,147,0.1)');
+        innerGlow.addColorStop(1, 'rgba(58,36,147,0)');
+        ctx.fillStyle = innerGlow;
         ctx.beginPath();
-        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.arc(cx, cy, radius * 0.9, 0, Math.PI * 2);
+        ctx.fill();
+
+        const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius * 0.28);
+        core.addColorStop(0, 'rgba(2,2,14,1)');
+        core.addColorStop(0.45, 'rgba(13,9,42,0.94)');
+        core.addColorStop(1, 'rgba(13,9,42,0)');
+        ctx.fillStyle = core;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius * 0.34, 0, Math.PI * 2);
         ctx.fill();
 
         texture.needsUpdate = true;
