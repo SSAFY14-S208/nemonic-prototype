@@ -243,26 +243,26 @@ class ThemePark {
 
     _createBooths() {
         const boothData = [
-            { name: '춘식이네 집', icon: '🏠', color: 0xff4040, roofColor: 0xe52525,
-              position: new THREE.Vector3(-7, 0, -6), gameType: 'yang',
-              desc: '아늑한 거실에서 양세찬 게임을 즐겨보세요!', action: '게임 시작',
-              theme: 'home', previewImage: 'assets/relay-drawing.png' },
-            { name: '망고 오피스', icon: '🏢', color: 0x2196F3, roofColor: 0x1565C0,
+            { name: '커뮤니티 부스', icon: '👥', color: 0xff4040, roofColor: 0xe52525,
+              position: new THREE.Vector3(-7, 0, -6), gameType: null,
+              desc: '서로의 메모와 아이디어를 모아보는 커뮤니티 공간입니다.', action: '커뮤니티 보기',
+              theme: 'community', previewImage: 'assets/커뮤니티.png' },
+            { name: '운세 부스', icon: '🔮', color: 0x2196F3, roofColor: 0x1565C0,
               position: new THREE.Vector3(7, 0, -6), gameType: null,
-              desc: '망고슬래브 사무실에서 오늘의 운세를 확인하세요!', action: '운세 보기',
-              theme: 'office', previewImage: 'assets/fortune-cookie.png' },
-            { name: '네모닉 볼링장', icon: '🎳', color: 0x9C27B0, roofColor: 0x7B1FA2,
+              desc: '오늘의 운세와 메시지를 가볍게 확인할 수 있는 공간입니다.', action: '운세 보기',
+              theme: 'fortune', previewImage: 'assets/운세.png' },
+            { name: '플립북 스튜디오', icon: '🎞️', color: 0x9C27B0, roofColor: 0x7B1FA2,
               position: new THREE.Vector3(-7, 0, 4), gameType: null,
-              desc: '오답노트를 만들어 실력을 키워보세요!', action: '사진 업로드',
-              theme: 'bowling', previewImage: 'assets/flipbook.png' },
-            { name: '네모 PC방', icon: '🖥️', color: 0xFFB300, roofColor: 0xF57F17,
+              desc: '장면을 넘기며 움직임을 만드는 플립북 체험 공간입니다.', action: '플립북 보기',
+              theme: 'flipbook', previewImage: 'assets/flipbook.png' },
+            { name: '릴레이 드로잉', icon: '✏️', color: 0xFFB300, roofColor: 0xF57F17,
               position: new THREE.Vector3(7, 0, 4), gameType: null,
-              desc: 'AI로 나만의 커스텀 스티커를 만들어보세요!', action: '스티커 만들기',
-              theme: 'pcroom', previewImage: null },
-            { name: '메모 카페', icon: '☕', color: 0x00C853, roofColor: 0x00962e,
+              desc: '차례대로 이어 그리며 하나의 그림을 완성하는 공간입니다.', action: '그림 이어보기',
+              theme: 'relay', previewImage: 'assets/relay-drawing.png' },
+            { name: '무한 캔버스', icon: '🎨', color: 0x00C853, roofColor: 0x00962e,
               position: new THREE.Vector3(0, 0, -9), gameType: null,
-              desc: '따뜻한 카페에서 자유 메모를 작성하세요.', action: '메모 작성',
-              theme: 'cafe', previewImage: null }
+              desc: '끝없이 이어지는 캔버스에 자유롭게 상상을 펼치는 공간입니다.', action: '캔버스 열기',
+              theme: 'canvas', previewImage: 'assets/무한캔버스.png' }
         ];
         boothData.forEach(data => {
             const { shell, interior } = this._buildRoom(data);
@@ -305,7 +305,7 @@ class ThemePark {
     _getPreviewTexture(path) {
         if (!path) return null;
         if (!this._previewTextureCache.has(path)) {
-            const tex = this.textureLoader.load(path);
+            const tex = this.textureLoader.load(encodeURI(path));
             tex.encoding = THREE.sRGBEncoding;
             tex.anisotropy = 4;
             this._previewTextureCache.set(path, tex);
@@ -315,9 +315,11 @@ class ThemePark {
 
     _getPreviewSize(path) {
         const sizes = {
-            'assets/relay-drawing.png': { width: 6.8, height: 3.95, depth: 3.8 },
-            'assets/fortune-cookie.png': { width: 6.2, height: 4.65, depth: 4.0 },
-            'assets/flipbook.png': { width: 6.4, height: 4.28, depth: 3.9 }
+            'assets/커뮤니티.png': { width: 6.4, height: 4.08, depth: 3.8 },
+            'assets/운세.png': { width: 6.4, height: 4.8, depth: 4.0 },
+            'assets/무한캔버스.png': { width: 6.6, height: 3.82, depth: 3.9 },
+            'assets/flipbook.png': { width: 6.4, height: 4.8, depth: 3.9 },
+            'assets/relay-drawing.png': { width: 6.9, height: 4.01, depth: 3.8 }
         };
         return sizes[path] || { width: 6.4, height: 4.2, depth: 3.8 };
     }
