@@ -42,26 +42,6 @@ class NemonicDevice {
         lid.position.y = bodyH;
         this.group.add(lid);
 
-        // 실제 제품처럼 대각선 윗면 골
-        const ribMat = new THREE.MeshStandardMaterial({
-            color: 0xd4cdc0,
-            roughness: 0.82,
-            metalness: 0.0
-        });
-        const ribCount = 13;
-        for (let i = 0; i < ribCount; i++) {
-            const x = -bodyW * 0.34 + i * 0.06;
-            const z = -0.03;
-            if (x > 0.02 && x < bodyW * 0.3) continue;
-            const rib = new THREE.Mesh(
-                new THREE.BoxGeometry(0.028, 0.012, bodyD * 1.05),
-                ribMat
-            );
-            rib.rotation.y = Math.PI / 4;
-            rib.position.set(x, bodyH + 0.022, z);
-            this.group.add(rib);
-        }
-
         // 슬롯 아래 상판 그림자톤으로 윗면 날아감을 줄임
         const topPanelGeo = new THREE.PlaneGeometry(bodyW * 0.92, bodyD * 0.84);
         const topPanelMat = new THREE.MeshStandardMaterial({
@@ -85,6 +65,8 @@ class NemonicDevice {
         this.paperSlot.rotation.y = -0.38;
         this.paperSlot.position.set(bodyW * 0.08, topY, bodyD * 0.14);
         this.group.add(this.paperSlot);
+        this._slotStart = this.paperSlot.position.clone();
+        this._slotRotationY = this.paperSlot.rotation.y;
 
         // LED 표시등 2개 (전면 오른쪽 하단)
         for (let i = 0; i < 2; i++) {
@@ -166,8 +148,13 @@ class NemonicDevice {
         this.printedMemo.castShadow = true;
 
         // 처음엔 기기 내부에 숨겨진 상태 (종이가 아래에 있음)
-        this.printedMemo.position.set(bodyW * 0.08, topY - 0.4, bodyD * 0.14);
+        this.printedMemo.position.set(
+            this._slotStart.x,
+            topY - 0.4,
+            this._slotStart.z
+        );
         this.printedMemo.rotation.x = -0.55; // 실제 네모닉처럼 뒤로 기울어짐 (~30도)
+        this.printedMemo.rotation.y = this._slotRotationY;
         this.printedMemo.name = 'printed-memo';
 
         this.group.add(this.printedMemo);
