@@ -150,7 +150,7 @@ class ThemePark {
         ];
         boothData.forEach(data => {
             const { shell, interior } = this._buildRoom(data);
-            shell.scale.set(1, 0.02, 1);
+            shell.visible = false;
             interior.visible = false;
             interior.scale.set(0, 0, 0);
             this.booths.push({ mesh: shell, interior, data, state: 'flat', springT: 0 });
@@ -159,62 +159,18 @@ class ThemePark {
 
     // === 에셋 카드형 부스 빌더 ===
     _buildRoom(data) {
-        const S = 3.8;
-        const hs = S / 2;
-
-        // Shell: 바닥 + 간판
         const shell = new THREE.Group();
         shell.position.copy(data.position);
-
-        const floorC = { home: 0xd4b888, office: 0xc0c8d4, bowling: 0xc4a070, pcroom: 0x2d2d4a, cafe: 0xc4a070 };
-        const floorMesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(S, S),
-            new THREE.MeshStandardMaterial({ color: floorC[data.theme] || 0xf0e6d3, roughness: 0.9 })
-        );
-        floorMesh.rotation.x = -Math.PI / 2;
-        floorMesh.position.y = 0.02;
-        shell.add(floorMesh);
-
-        // 바닥 테두리 (컬러 윤곽선)
-        const borderMat = new THREE.MeshStandardMaterial({ color: data.color, roughness: 0.5 });
-        const bw = 0.08;
-        [
-            { geo: [S, bw, bw], pos: [0, bw/2, -hs] },
-            { geo: [S, bw, bw], pos: [0, bw/2, hs] },
-            { geo: [bw, bw, S], pos: [-hs, bw/2, 0] },
-            { geo: [bw, bw, S], pos: [hs, bw/2, 0] },
-        ].forEach(({ geo, pos }) => {
-            const b = new THREE.Mesh(new THREE.BoxGeometry(...geo), borderMat);
-            b.position.set(...pos);
-            shell.add(b);
-        });
-
-        const signCanvas = document.createElement('canvas');
-        signCanvas.width = 256; signCanvas.height = 64;
-        const sctx = signCanvas.getContext('2d');
-        sctx.fillStyle = '#' + data.color.toString(16).padStart(6, '0');
-        sctx.beginPath(); sctx.roundRect(2, 2, 252, 60, 10); sctx.fill();
-        sctx.fillStyle = '#ffffff';
-        sctx.font = 'bold 28px "Apple SD Gothic Neo", sans-serif';
-        sctx.textAlign = 'center';
-        sctx.fillText(data.icon + ' ' + data.name, 128, 42);
-        const signMesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(2.0, 0.5),
-            new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(signCanvas), transparent: true })
-        );
-        signMesh.position.set(0, 2.55, -hs + 0.05);
-        shell.add(signMesh);
-
         this.group.add(shell);
 
-        // Interior: 에셋 이미지가 그대로 위로 뿅 등장
+        // Interior: 에셋 이미지 자체가 위치에서 뿅 등장
         const interior = new THREE.Group();
         interior.position.copy(data.position);
 
         if (data.previewImage) {
             const preview = this._createPreviewPlane(data.previewImage, 2.55, 1.85, {
                 frameColor: 0xffffff,
-                y: 0.96,
+                y: 1.02,
                 z: 0.02,
                 rotateX: 0,
                 shadowOpacity: 0.18
@@ -685,13 +641,11 @@ class ThemePark {
                 const t = Math.min(booth.springT, 1);
                 const e = 1 - Math.pow(1-t, 3) * Math.cos(t * Math.PI * 2);
                 const s = Math.max(0.02, e);
-                booth.mesh.scale.set(1, s, 1);
                 booth.interior.scale.set(s, s, s);
                 if (t >= 1) booth.state = 'full';
             }
             if (booth.state === 'full') {
                 const idle = 1 + Math.sin(Date.now() * 0.002) * 0.006;
-                booth.mesh.scale.set(1, idle, 1);
                 booth.interior.scale.set(idle, idle, idle);
             }
         });

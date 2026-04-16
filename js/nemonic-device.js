@@ -62,7 +62,7 @@ class NemonicDevice {
         const slitGeo = new THREE.BoxGeometry(bodyW * 0.34, 0.003, 0.018);
         const slitMat = new THREE.MeshStandardMaterial({ color: 0x7a7c7f, roughness: 0.48, metalness: 0.22 });
         this.paperSlot = new THREE.Mesh(slitGeo, slitMat);
-        this.paperSlot.rotation.y = -0.38;
+        this.paperSlot.rotation.y = 0;
         this.paperSlot.position.set(bodyW * 0.08, topY, bodyD * 0.14);
         this.group.add(this.paperSlot);
         this._slotStart = this.paperSlot.position.clone();
