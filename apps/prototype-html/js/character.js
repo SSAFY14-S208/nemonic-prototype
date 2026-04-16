@@ -38,7 +38,10 @@ class CharacterController {
         this.footprints = [];
         this.lastFootprintPos = new THREE.Vector3();
         this.footprintSide = 0; // 좌우 교대
-        this._footprintPool = this._createFootprintPool(30);
+        this._footprintPool = this._createFootprintPool(60);
+        this._groundAnchors = [];
+        this._anchorGroundOffset = 0;
+        this._groundProbe = new THREE.Vector3();
 
         // 모바일 조이스틱
         this.joystickInput = { x: 0, y: 0 };
@@ -74,20 +77,27 @@ class CharacterController {
         return pool;
     }
 
-    _spawnFootprint(x, z, angle, side) {
+    _spawnFootprint(x, z, angle, side, forwardOffset = 0) {
         // 풀에서 비활성 발자국 찾기
         const fp = this._footprintPool.find(f => !f.active);
         if (!fp) return;
 
         const offsetX = Math.cos(angle + Math.PI / 2) * 0.12 * side;
         const offsetZ = Math.sin(angle + Math.PI / 2) * 0.12 * side;
+        const stepOffsetX = Math.sin(angle) * forwardOffset;
+        const stepOffsetZ = Math.cos(angle) * forwardOffset;
 
-        fp.mesh.position.set(x + offsetX, 0.03, z + offsetZ);
+        fp.mesh.position.set(x + offsetX + stepOffsetX, 0.03, z + offsetZ + stepOffsetZ);
         fp.mesh.rotation.z = -angle + Math.PI / 2;
         fp.mesh.material.opacity = 0.35;
         fp.mesh.visible = true;
         fp.life = 1.0;
         fp.active = true;
+    }
+
+    _spawnFootprintPair(x, z, angle) {
+        this._spawnFootprint(x, z, angle, -1, -0.05);
+        this._spawnFootprint(x, z, angle, 1, 0.05);
     }
 
     _updateFootprints(dt) {
@@ -147,30 +157,93 @@ class CharacterController {
         this.group.add(this.modelRoot);
 
         const loader = new THREE.GLTFLoader();
-        loader.load(
-            'assets/nong_dam_gom.glb',
-            (gltf) => {
-                const bear = gltf.scene;
-                bear.scale.setScalar(0.88);
-                bear.position.set(0, 0, 0);
-                bear.traverse((obj) => {
-                    if (obj.isMesh) {
-                        obj.castShadow = true;
-                        obj.receiveShadow = true;
-                    }
-                });
-                this.modelRoot.add(bear);
-                this._setupAnimations(gltf.animations);
-            },
-            undefined,
-            (err) => {
-                console.error('GLB load error:', err);
-                this._buildFallbackCharacter();
-            }
-        );
+        this._loadNongDamGom(loader);
+    }
+
+    _loadNongDamGom(loader) {
+        const mountCharacter = (gltf) => {
+            this.modelRoot.clear();
+            this.animActions = {};
+            this.currentAction = null;
+            this.mixer = null;
+            this._groundAnchors = [];
+            this._anchorGroundOffset = 0;
+
+            const bear = gltf.scene;
+            bear.position.set(0, 0, 0);
+            bear.scale.setScalar(1);
+            bear.traverse((obj) => {
+                if (obj.isMesh) {
+                    obj.castShadow = true;
+                    obj.receiveShadow = true;
+                }
+            });
+
+            const baseBox = new THREE.Box3().setFromObject(bear);
+            const baseSize = new THREE.Vector3();
+            baseBox.getSize(baseSize);
+
+            const targetHeight = 1.3;
+            const fittedScale = baseSize.y > 0 ? targetHeight / baseSize.y : 0.55;
+            bear.scale.setScalar(fittedScale);
+
+            const fittedBox = new THREE.Box3().setFromObject(bear);
+            const fittedCenter = new THREE.Vector3();
+            fittedBox.getCenter(fittedCenter);
+            bear.position.x -= fittedCenter.x;
+            bear.position.z -= fittedCenter.z;
+            bear.position.y = -fittedBox.min.y;
+
+            this.modelRoot.add(bear);
+            this.modelRoot.position.y = 0;
+            this._groundAnchors = this._findGroundAnchors(bear);
+            this._captureGroundReference();
+            this._groundModelToFloor();
+            this._setupAnimations(gltf.animations);
+        };
+
+        const loadFromUrl = () => {
+            loader.load(
+                'assets/nong_dam_gom.glb',
+                (gltf) => mountCharacter(gltf),
+                undefined,
+                (err) => {
+                    console.error('GLB load error:', err);
+                    this._buildFallbackCharacter();
+                }
+            );
+        };
+
+        if (!window.NONG_DAM_GOM_GLB_BASE64) {
+            loadFromUrl();
+            return;
+        }
+
+        try {
+            const arrayBuffer = this._decodeBase64ToArrayBuffer(window.NONG_DAM_GOM_GLB_BASE64);
+            loader.parse(
+                arrayBuffer,
+                window.location.href,
+                (gltf) => mountCharacter(gltf),
+                (err) => {
+                    console.error('Embedded GLB parse error:', err);
+                    loadFromUrl();
+                }
+            );
+        } catch (err) {
+            console.error('Embedded GLB decode error:', err);
+            loadFromUrl();
+        }
     }
 
     _buildFallbackCharacter() {
+        this.modelRoot.clear();
+        this.animActions = {};
+        this.currentAction = null;
+        this.mixer = null;
+        this._groundAnchors = [];
+        this._anchorGroundOffset = 0;
+
         const bodyMat = new THREE.MeshStandardMaterial({
             color: 0xf4f0e4, roughness: 0.55, metalness: 0.02
         });
@@ -217,6 +290,7 @@ class CharacterController {
         this.modelRoot.add(nose);
 
         this.modelRoot.scale.setScalar(1.28);
+        this.modelRoot.position.y = 0;
     }
 
     _setupAnimations(animations) {
@@ -224,7 +298,8 @@ class CharacterController {
         this.mixer = new THREE.AnimationMixer(this.modelRoot);
         animations.forEach((clip) => {
             const key = clip.name.toLowerCase();
-            this.animActions[key] = this.mixer.clipAction(clip);
+            const normalizedClip = this._normalizeAnimationClip(clip);
+            this.animActions[key] = this.mixer.clipAction(normalizedClip);
         });
         this._playAnimationByHint('idle');
     }
@@ -232,6 +307,98 @@ class CharacterController {
     _findAnimationKey(hint) {
         const keys = Object.keys(this.animActions);
         return keys.find((key) => key.includes(hint)) || keys[0] || null;
+    }
+
+    _decodeBase64ToArrayBuffer(base64) {
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes.buffer;
+    }
+
+    _normalizeAnimationClip(clip) {
+        const normalized = clip.clone();
+        normalized.tracks.forEach((track) => {
+            if (!/position$/i.test(track.name)) return;
+            if (!/(hips|armature)/i.test(track.name)) return;
+            if (!track.values || track.values.length < 3) return;
+
+            const baseX = track.values[0];
+            const baseY = track.values[1];
+            const baseZ = track.values[2];
+            for (let i = 0; i < track.values.length; i += 3) {
+                track.values[i] = baseX;
+                track.values[i + 1] = baseY;
+                track.values[i + 2] = baseZ;
+            }
+        });
+        return normalized;
+    }
+
+    _findGroundAnchors(root) {
+        const names = ['LeftFoot_end', 'RightFoot_end', 'LeftFoot', 'RightFoot'];
+        return names
+            .map((name) => root.getObjectByName(name))
+            .filter(Boolean);
+    }
+
+    _getAnchorMinY() {
+        if (!this._groundAnchors || this._groundAnchors.length === 0) return null;
+
+        let minY = Infinity;
+        this._groundAnchors.forEach((anchor) => {
+            anchor.getWorldPosition(this._groundProbe);
+            minY = Math.min(minY, this._groundProbe.y);
+        });
+
+        return Number.isFinite(minY) ? minY : null;
+    }
+
+    _captureGroundReference() {
+        if (!this.modelRoot || this.modelRoot.children.length === 0) return;
+
+        this.group.updateMatrixWorld(true);
+        this.modelRoot.updateMatrixWorld(true);
+
+        const anchorMinY = this._getAnchorMinY();
+        if (anchorMinY == null) {
+            this._anchorGroundOffset = 0;
+            return;
+        }
+
+        const box = new THREE.Box3().setFromObject(this.modelRoot);
+        if (!Number.isFinite(box.min.y)) {
+            this._anchorGroundOffset = 0;
+            return;
+        }
+
+        this._anchorGroundOffset = box.min.y - anchorMinY;
+    }
+
+    _groundModelToFloor() {
+        if (!this.modelRoot || this.modelRoot.children.length === 0) return;
+
+        this.group.updateMatrixWorld(true);
+        this.modelRoot.updateMatrixWorld(true);
+
+        const desiredFloorY = this.group.position.y;
+        let currentFloorY = null;
+
+        const anchorMinY = this._getAnchorMinY();
+        if (anchorMinY != null) {
+            currentFloorY = anchorMinY + this._anchorGroundOffset;
+        } else {
+            const box = new THREE.Box3().setFromObject(this.modelRoot);
+            if (!Number.isFinite(box.min.y) || !Number.isFinite(box.max.y)) return;
+            currentFloorY = box.min.y;
+        }
+
+        const delta = currentFloorY - desiredFloorY;
+        if (Math.abs(delta) < 0.0001) return;
+
+        this.modelRoot.position.y -= delta;
     }
 
     _playAnimationByHint(hint) {
@@ -440,11 +607,13 @@ class CharacterController {
             : new THREE.Vector3();
         const velocityLerp = 1 - Math.exp(-(desiredMoveDir ? this.moveAcceleration : this.moveDeceleration) * dt);
         this.velocity.lerp(desiredVelocity, velocityLerp);
+        this.velocity.y = 0; // Y축 이동 방지
         if (!desiredMoveDir && this.velocity.lengthSq() < this.minMoveSpeed * this.minMoveSpeed) {
             this.velocity.set(0, 0, 0);
         }
 
         this.group.position.addScaledVector(this.velocity, dt);
+        this.group.position.y = 0; // 항상 바닥에 고정
 
         const planarSpeed = Math.hypot(this.velocity.x, this.velocity.z);
         const isWalking = planarSpeed > 0.18;
@@ -499,13 +668,13 @@ class CharacterController {
         // --- 걸음 애니메이션 ---
         if (isWalking) {
             this.walkCycle += dt * 8;
-            this.group.position.y = this.baseY * 0.85 + Math.abs(Math.sin(this.walkCycle)) * 0.025;
+            this.group.position.y = 0;
             if (this.modelRoot) {
                 this.modelRoot.rotation.z = Math.sin(this.walkCycle) * 0.04;
             }
             this._playAnimationByHint('walk');
         } else {
-            this.group.position.y *= 0.85;
+            this.group.position.y = 0;
             if (this.modelRoot) {
                 this.modelRoot.rotation.z *= 0.82;
             }
@@ -516,11 +685,10 @@ class CharacterController {
         if (isWalking) {
             const distFromLast = this.group.position.distanceTo(this.lastFootprintPos);
             if (distFromLast > 0.6) {
-                this.footprintSide *= -1;
                 const angle = this.group.rotation.y;
-                this._spawnFootprint(
+                this._spawnFootprintPair(
                     this.group.position.x, this.group.position.z,
-                    angle, this.footprintSide
+                    angle
                 );
                 this.lastFootprintPos.copy(this.group.position);
             }
@@ -530,6 +698,8 @@ class CharacterController {
         if (this.mixer) {
             this.mixer.update(dt);
         }
+
+        this._groundModelToFloor();
 
         // 클릭 마커 펄스 애니메이션
         if (this.clickMarker.visible && this._markerRing) {

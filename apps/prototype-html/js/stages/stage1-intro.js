@@ -82,6 +82,7 @@ class Stage1Intro {
 
     async _showStartButton() {
         Utils.show('start-btn-container');
+        document.getElementById('start-btn').textContent = '네모닉 월드 입장';
 
         return new Promise(resolve => {
             document.getElementById('start-btn').addEventListener('click', () => {

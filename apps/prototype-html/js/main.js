@@ -15,9 +15,21 @@ class NemonicTourApp {
     async _init() {
         this.nemonicScene = new NemonicScene();
         this._hideLoadingScreen();
+        this._showWelcomeBanner();
         this._animate();
         this._setupSkipButton();
         this._runStages();
+    }
+
+    _showWelcomeBanner() {
+        const banner = document.getElementById('welcome-banner');
+        if (!banner) return;
+        banner.classList.remove('hidden');
+        requestAnimationFrame(() => banner.classList.add('show'));
+        setTimeout(() => {
+            banner.classList.remove('show');
+            setTimeout(() => banner.classList.add('hidden'), 600);
+        }, 3500);
     }
 
     _setupSkipButton() {
@@ -87,6 +99,7 @@ class NemonicTourApp {
         this.isThemeParkMode = true;
         this.currentStage = 6;
         Utils.hide('skip-btn');
+        Utils.hide('welcome-banner');
 
         try {
         // OrbitControls 비활성화
@@ -189,6 +202,7 @@ class NemonicTourApp {
                     whiteoutText.style.opacity = '0';
                     whiteoutText.style.transform = 'translateY(14px)';
                 }
+
             }
         })
             .to(whiteoutText, {
@@ -205,7 +219,10 @@ class NemonicTourApp {
             .to(this.character.group.position, {
                 duration: 0.9,
                 y: 0,
-                ease: 'bounce.out'
+                ease: 'bounce.out',
+                onComplete: () => {
+                    this.character.group.position.y = 0;
+                }
             }, 0.18)
             .to(this.activeCamera.position, {
                 duration: 1.0,
