@@ -254,7 +254,7 @@ class ThemePark {
             { name: '네모닉 볼링장', icon: '🎳', color: 0x9C27B0, roofColor: 0x7B1FA2,
               position: new THREE.Vector3(-7, 0, 4), gameType: null,
               desc: '오답노트를 만들어 실력을 키워보세요!', action: '사진 업로드',
-              theme: 'bowling', previewImage: 'assets/flipbook.jpeg' },
+              theme: 'bowling', previewImage: 'assets/flipbook.png' },
             { name: '네모 PC방', icon: '🖥️', color: 0xFFB300, roofColor: 0xF57F17,
               position: new THREE.Vector3(7, 0, 4), gameType: null,
               desc: 'AI로 나만의 커스텀 스티커를 만들어보세요!', action: '스티커 만들기',
@@ -317,7 +317,7 @@ class ThemePark {
         const sizes = {
             'assets/relay-drawing.png': { width: 6.8, height: 3.95, depth: 3.8 },
             'assets/fortune-cookie.png': { width: 6.2, height: 4.65, depth: 4.0 },
-            'assets/flipbook.jpeg': { width: 6.4, height: 4.28, depth: 3.9 }
+            'assets/flipbook.png': { width: 6.4, height: 4.28, depth: 3.9 }
         };
         return sizes[path] || { width: 6.4, height: 4.2, depth: 3.8 };
     }
@@ -834,27 +834,82 @@ class ThemePark {
         Utils.hide('booth-overlay');
     }
 
+    _worldToMinimap(x, z, w, h, padding = 14) {
+        const bounds = {
+            minX: -16,
+            maxX: 16,
+            minZ: -12,
+            maxZ: 14
+        };
+        const usableW = w - padding * 2;
+        const usableH = h - padding * 2;
+        const nx = (x - bounds.minX) / (bounds.maxX - bounds.minX);
+        const nz = (z - bounds.minZ) / (bounds.maxZ - bounds.minZ);
+        return {
+            x: padding + nx * usableW,
+            y: padding + nz * usableH
+        };
+    }
+
+    _drawMinimapRoad(ctx, x, z, width, depth, canvasW, canvasH) {
+        const topLeft = this._worldToMinimap(x - width / 2, z - depth / 2, canvasW, canvasH);
+        const bottomRight = this._worldToMinimap(x + width / 2, z + depth / 2, canvasW, canvasH);
+        const left = Math.min(topLeft.x, bottomRight.x);
+        const top = Math.min(topLeft.y, bottomRight.y);
+        const rectW = Math.abs(bottomRight.x - topLeft.x);
+        const rectH = Math.abs(bottomRight.y - topLeft.y);
+
+        ctx.fillStyle = 'rgba(235, 224, 205, 0.95)';
+        ctx.fillRect(left, top, rectW, rectH);
+    }
+
     renderMinimap(characterPos) {
         const canvas = document.getElementById('minimap-canvas');
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
-        const w = canvas.width, h = canvas.height, sc = 3;
+        const w = canvas.width;
+        const h = canvas.height;
         ctx.clearRect(0, 0, w, h);
-        ctx.fillStyle = 'rgba(245,243,239,0.9)';
-        ctx.beginPath(); ctx.roundRect(0,0,w,h,10); ctx.fill();
-        ctx.fillStyle = 'rgba(245,230,200,0.5)';
-        ctx.fillRect(w/2-3,0,6,h);
-        ctx.fillRect(0,h/2+5,w,6);
+
+        ctx.fillStyle = 'rgba(245,243,239,0.94)';
+        ctx.beginPath();
+        ctx.roundRect(0, 0, w, h, 18);
+        ctx.fill();
+
+        this._drawMinimapRoad(ctx, 0, 0, 3, 30, w, h);
+        this._drawMinimapRoad(ctx, -8.25, -2, 13.5, 3, w, h);
+        this._drawMinimapRoad(ctx, 8.25, -2, 13.5, 3, w, h);
+        this._drawMinimapRoad(ctx, 0, -2, 3.04, 3.04, w, h);
+
+        const entryLeft = this._worldToMinimap(-2.1, 12, w, h);
+        const entryRight = this._worldToMinimap(2.1, 12, w, h);
+        ctx.strokeStyle = 'rgba(53, 37, 176, 0.95)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(entryLeft.x, entryLeft.y);
+        ctx.lineTo(entryRight.x, entryRight.y);
+        ctx.stroke();
+
         this.booths.forEach(b => {
-            const bx = w/2+b.data.position.x*sc, by = h/2+b.data.position.z*sc;
-            ctx.fillStyle = '#'+b.data.color.toString(16).padStart(6,'0');
-            ctx.beginPath(); ctx.arc(bx,by,5,0,Math.PI*2); ctx.fill();
+            const pos = this._worldToMinimap(b.data.position.x, b.data.position.z, w, h);
+            ctx.fillStyle = '#' + b.data.color.toString(16).padStart(6, '0');
+            ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, 7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
         });
-        const cx = w/2+characterPos.x*sc, cy = h/2+characterPos.z*sc;
+
+        const cpos = this._worldToMinimap(characterPos.x, characterPos.z, w, h);
         ctx.fillStyle = '#6366f1';
-        ctx.beginPath(); ctx.arc(cx,cy,4,0,Math.PI*2); ctx.fill();
+        ctx.beginPath();
+        ctx.arc(cpos.x, cpos.y, 5, 0, Math.PI * 2);
+        ctx.fill();
         ctx.fillStyle = '#fff';
-        ctx.beginPath(); ctx.arc(cx,cy,2,0,Math.PI*2); ctx.fill();
+        ctx.beginPath();
+        ctx.arc(cpos.x, cpos.y, 2.5, 0, Math.PI * 2);
+        ctx.fill();
     }
 }
 
