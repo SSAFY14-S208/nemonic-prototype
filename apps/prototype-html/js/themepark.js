@@ -250,7 +250,7 @@ class ThemePark {
             { name: '운세 부스', icon: '🔮', color: 0x2196F3, roofColor: 0x1565C0,
               position: new THREE.Vector3(7, 0, -6), gameType: null,
               desc: '오늘의 운세와 메시지를 가볍게 확인할 수 있는 공간입니다.', action: '운세 보기',
-              theme: 'fortune', previewImage: 'assets/fortune.png' },
+              theme: 'fortune', previewImage: 'assets/운세.png' },
             { name: '플립북 스튜디오', icon: '🎞️', color: 0x9C27B0, roofColor: 0x7B1FA2,
               position: new THREE.Vector3(-7, 0, 4), gameType: null,
               desc: '장면을 넘기며 움직임을 만드는 플립북 체험 공간입니다.', action: '플립북 보기',
@@ -312,7 +312,7 @@ class ThemePark {
     _getPreviewSize(path) {
         const sizes = {
             'assets/community.png': { width: 6.4, height: 4.08, depth: 3.8 },
-            'assets/fortune.png': { width: 6.4, height: 4.8, depth: 4.0 },
+            'assets/운세.png': { width: 6.4, height: 4.8, depth: 4.0 },
             'assets/flipbook.png': { width: 6.4, height: 4.8, depth: 3.9 },
             'assets/relay-drawing.png': { width: 6.9, height: 4.01, depth: 3.8 }
         };

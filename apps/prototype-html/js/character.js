@@ -6,9 +6,10 @@ class CharacterController {
         this.moveSpeed = 5;
         this.isActive = false;
         this.camera = null;
-        this.moveAcceleration = 12;
-        this.moveDeceleration = 10;
-        this.turnResponsiveness = 10;
+        this.moveAccelerationKeyboard = 18;
+        this.moveAccelerationClick = 11;
+        this.moveDeceleration = 14;
+        this.turnResponsiveness = 14;
         this.minMoveSpeed = 0.05;
 
         // 클릭 이동
@@ -22,8 +23,12 @@ class CharacterController {
         this.cameraSideOffset = 0;
         this.cameraLookHeight = 1.25;
         this.cameraLookAhead = 2.8;
-        this.cameraLerp = 0.12;
+        this.cameraLookAheadBoost = 0.9;
+        this.cameraLerpIdle = 0.1;
+        this.cameraLerpMoving = 0.18;
         this.turnLerp = 0.24;
+        this.inputDeadZone = 0.14;
+        this.inputCurveExponent = 1.25;
 
         // 바닥 레이캐스팅용
         this.raycaster = new THREE.Raycaster();
@@ -521,8 +526,8 @@ class CharacterController {
             const len = Math.sqrt(dx * dx + dy * dy);
             if (len > 1) { dx /= len; dy /= len; }
             stick.style.transform = `translate(${dx * 20}px, ${dy * 20}px)`;
-            this.joystickInput.x = dx;
-            this.joystickInput.y = dy;
+            this.joystickInput.x = this._shapeAnalogInput(dx);
+            this.joystickInput.y = this._shapeAnalogInput(dy);
         };
         const onEnd = () => {
             dragging = false;
@@ -559,6 +564,7 @@ class CharacterController {
 
         let desiredMoveDir = null;
         let desiredSpeed = 0;
+        let movementMode = 'idle';
 
         // --- 1. 클릭 이동 ---
         if (this.isMoving && this.targetPos) {
@@ -569,10 +575,11 @@ class CharacterController {
             if (dist > 0.08) {
                 dir.normalize();
                 desiredMoveDir = dir;
-                desiredSpeed = this.moveSpeed * Math.min(1, Math.max(0.12, dist / 1.4));
-                if (dist < 0.45) {
-                    desiredSpeed *= dist / 0.45;
+                desiredSpeed = this.moveSpeed * Math.min(1, Math.max(0.18, dist / 1.8));
+                if (dist < 0.8) {
+                    desiredSpeed *= Math.max(0.22, dist / 0.8);
                 }
+                movementMode = 'click';
             } else {
                 // 도착
                 this.isMoving = false;
@@ -598,14 +605,21 @@ class CharacterController {
             this.targetPos = null;
             this.clickMarker.visible = false;
 
+            const inputMagnitude = Math.min(1, Math.hypot(inputX, inputForward));
             desiredMoveDir = this._getMoveDirectionFromInput(inputX, inputForward);
-            desiredSpeed = this.moveSpeed;
+            desiredSpeed = this.moveSpeed * Math.max(0.4, inputMagnitude);
+            movementMode = 'manual';
         }
 
         const desiredVelocity = desiredMoveDir
             ? desiredMoveDir.clone().multiplyScalar(desiredSpeed)
             : new THREE.Vector3();
-        const velocityLerp = 1 - Math.exp(-(desiredMoveDir ? this.moveAcceleration : this.moveDeceleration) * dt);
+        const acceleration = movementMode === 'manual'
+            ? this.moveAccelerationKeyboard
+            : movementMode === 'click'
+                ? this.moveAccelerationClick
+                : this.moveDeceleration;
+        const velocityLerp = 1 - Math.exp(-acceleration * dt);
         this.velocity.lerp(desiredVelocity, velocityLerp);
         this.velocity.y = 0; // Y축 이동 방지
         if (!desiredMoveDir && this.velocity.lengthSq() < this.minMoveSpeed * this.minMoveSpeed) {
@@ -623,7 +637,8 @@ class CharacterController {
             let diff = targetAngle - this.group.rotation.y;
             while (diff > Math.PI) diff -= Math.PI * 2;
             while (diff < -Math.PI) diff += Math.PI * 2;
-            const rotationLerp = 1 - Math.exp(-this.turnResponsiveness * dt);
+            const speedRatio = Math.min(1, planarSpeed / this.moveSpeed);
+            const rotationLerp = 1 - Math.exp(-(this.turnResponsiveness + speedRatio * 4) * dt);
             this.group.rotation.y += diff * rotationLerp;
         }
 
@@ -714,10 +729,12 @@ class CharacterController {
 
     _updateCamera(dt) {
         const { position, lookAt } = this._getCameraTargets();
+        const speedRatio = Math.min(1, Math.hypot(this.velocity.x, this.velocity.z) / this.moveSpeed);
+        const followLerp = this.cameraLerpIdle + (this.cameraLerpMoving - this.cameraLerpIdle) * speedRatio;
 
-        this.camera.position.x += (position.x - this.camera.position.x) * this.cameraLerp;
-        this.camera.position.y += (position.y - this.camera.position.y) * this.cameraLerp;
-        this.camera.position.z += (position.z - this.camera.position.z) * this.cameraLerp;
+        this.camera.position.x += (position.x - this.camera.position.x) * followLerp;
+        this.camera.position.y += (position.y - this.camera.position.y) * followLerp;
+        this.camera.position.z += (position.z - this.camera.position.z) * followLerp;
         this.camera.lookAt(lookAt);
     }
 
@@ -734,6 +751,8 @@ class CharacterController {
             Math.cos(this.group.rotation.y)
         ).normalize();
         const side = new THREE.Vector3(forward.z, 0, -forward.x);
+        const speedRatio = Math.min(1, Math.hypot(this.velocity.x, this.velocity.z) / this.moveSpeed);
+        const lookAhead = this.cameraLookAhead + this.cameraLookAheadBoost * speedRatio;
 
         const position = anchor.clone()
             .addScaledVector(forward, -this.cameraDistance)
@@ -741,7 +760,7 @@ class CharacterController {
         position.y = this.cameraHeight;
 
         const lookAt = anchor.clone()
-            .addScaledVector(forward, this.cameraLookAhead)
+            .addScaledVector(forward, lookAhead)
             .addScaledVector(side, this.cameraSideOffset * 0.2);
         lookAt.y = this.cameraLookHeight;
 
@@ -764,8 +783,18 @@ class CharacterController {
         this.keys = {};
         this.joystickInput.x = 0;
         this.joystickInput.y = 0;
+        this.velocity.set(0, 0, 0);
         const stick = document.querySelector('.joystick-stick');
         if (stick) stick.style.transform = '';
+    }
+
+    _shapeAnalogInput(value) {
+        const magnitude = Math.abs(value);
+        if (magnitude <= this.inputDeadZone) return 0;
+
+        const normalized = (magnitude - this.inputDeadZone) / (1 - this.inputDeadZone);
+        const curved = Math.pow(normalized, this.inputCurveExponent);
+        return Math.sign(value) * curved;
     }
 
     _getMoveDirectionFromInput(inputX, inputForward) {
