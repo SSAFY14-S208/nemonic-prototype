@@ -278,7 +278,7 @@ class Stage4Attach {
             Math.max(bounds.w, bounds.h) * Math.max(W, H) * 1.35,
             Math.max(W, H) * 1.05
         );
-        const maskTex = new THREE.Texture(maskCanvas);
+        const maskTex = new THREE.CanvasTexture(maskCanvas);
         maskTex.minFilter = THREE.LinearFilter;
         maskTex.magFilter = THREE.LinearFilter;
         maskTex.needsUpdate = true;
@@ -290,7 +290,7 @@ class Stage4Attach {
             canvas.width = W;
             canvas.height = H;
             const ctx = canvas.getContext('2d');
-            const texture = new THREE.Texture(canvas);
+            const texture = new THREE.CanvasTexture(canvas);
             texture.minFilter = THREE.LinearFilter;
             texture.magFilter = THREE.LinearFilter;
             texture.center.set(0.5, 0.5);
@@ -308,6 +308,7 @@ class Stage4Attach {
                     map: texture,
                     alphaMap: maskTex,
                     transparent: true,
+                    depthTest: false,
                     depthWrite: false,
                     polygonOffset: true,
                     polygonOffsetFactor: 1,
@@ -317,8 +318,9 @@ class Stage4Attach {
                 })
             );
             mesh.userData.baseOpacity = baseOpacity;
-            mesh.renderOrder = 4 + layer;
-            mesh.position.set(dp.x, dp.y, dp.z + 0.001 - layer * 0.0015);
+            mesh.frustumCulled = false;
+            mesh.renderOrder = 12 + layer;
+            mesh.position.set(dp.x, dp.y, dp.z + 0.009 - layer * 0.0004);
             this.scene.scene.add(mesh);
             layers.push(mesh);
         }
