@@ -246,11 +246,11 @@ class ThemePark {
             { name: '커뮤니티 부스', icon: '👥', color: 0xff4040, roofColor: 0xe52525,
               position: new THREE.Vector3(-7, 0, -6), gameType: null,
               desc: '서로의 메모와 아이디어를 모아보는 커뮤니티 공간입니다.', action: '커뮤니티 보기',
-              theme: 'community', previewImage: 'assets/커뮤니티.png' },
+              theme: 'community', previewImage: 'assets/community.png' },
             { name: '운세 부스', icon: '🔮', color: 0x2196F3, roofColor: 0x1565C0,
               position: new THREE.Vector3(7, 0, -6), gameType: null,
               desc: '오늘의 운세와 메시지를 가볍게 확인할 수 있는 공간입니다.', action: '운세 보기',
-              theme: 'fortune', previewImage: 'assets/운세.png' },
+              theme: 'fortune', previewImage: 'assets/fortune.png' },
             { name: '플립북 스튜디오', icon: '🎞️', color: 0x9C27B0, roofColor: 0x7B1FA2,
               position: new THREE.Vector3(-7, 0, 4), gameType: null,
               desc: '장면을 넘기며 움직임을 만드는 플립북 체험 공간입니다.', action: '플립북 보기',
@@ -258,11 +258,7 @@ class ThemePark {
             { name: '릴레이 드로잉', icon: '✏️', color: 0xFFB300, roofColor: 0xF57F17,
               position: new THREE.Vector3(7, 0, 4), gameType: null,
               desc: '차례대로 이어 그리며 하나의 그림을 완성하는 공간입니다.', action: '그림 이어보기',
-              theme: 'relay', previewImage: 'assets/relay-drawing.png' },
-            { name: '무한 캔버스', icon: '🎨', color: 0x00C853, roofColor: 0x00962e,
-              position: new THREE.Vector3(0, 0, -9), gameType: null,
-              desc: '끝없이 이어지는 캔버스에 자유롭게 상상을 펼치는 공간입니다.', action: '캔버스 열기',
-              theme: 'canvas', previewImage: 'assets/무한캔버스.png' }
+              theme: 'relay', previewImage: 'assets/relay-drawing.png' }
         ];
         boothData.forEach(data => {
             const { shell, interior } = this._buildRoom(data);
@@ -315,9 +311,8 @@ class ThemePark {
 
     _getPreviewSize(path) {
         const sizes = {
-            'assets/커뮤니티.png': { width: 6.4, height: 4.08, depth: 3.8 },
-            'assets/운세.png': { width: 6.4, height: 4.8, depth: 4.0 },
-            'assets/무한캔버스.png': { width: 6.6, height: 3.82, depth: 3.9 },
+            'assets/community.png': { width: 6.4, height: 4.08, depth: 3.8 },
+            'assets/fortune.png': { width: 6.4, height: 4.8, depth: 4.0 },
             'assets/flipbook.png': { width: 6.4, height: 4.8, depth: 3.9 },
             'assets/relay-drawing.png': { width: 6.9, height: 4.01, depth: 3.8 }
         };
