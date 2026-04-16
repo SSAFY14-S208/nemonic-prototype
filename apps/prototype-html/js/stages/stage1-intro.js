@@ -15,6 +15,7 @@ class Stage1Intro {
 
         // 기기 앞까지 쭉 다가감
         await this._cinematicIntro(camera, devicePos);
+        await this._showStartButton();
     }
 
     async _cinematicIntro(camera, target) {

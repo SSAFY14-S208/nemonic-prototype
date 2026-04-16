@@ -142,11 +142,11 @@ class ThemePark {
             { name: '네모 PC방', icon: '🖥️', color: 0xFFB300, roofColor: 0xF57F17,
               position: new THREE.Vector3(7, 0, 4), gameType: null,
               desc: 'AI로 나만의 커스텀 스티커를 만들어보세요!', action: '스티커 만들기',
-              theme: 'pcroom', previewImage: 'assets/fortune-cookie.png' },
+              theme: 'pcroom', previewImage: null },
             { name: '메모 카페', icon: '☕', color: 0x00C853, roofColor: 0x00962e,
               position: new THREE.Vector3(0, 0, -9), gameType: null,
               desc: '따뜻한 카페에서 자유 메모를 작성하세요.', action: '메모 작성',
-              theme: 'cafe', previewImage: 'assets/relay-drawing.png' }
+              theme: 'cafe', previewImage: null }
         ];
         boothData.forEach(data => {
             const { shell, interior } = this._buildRoom(data);
@@ -163,19 +163,18 @@ class ThemePark {
         shell.position.copy(data.position);
         this.group.add(shell);
 
-        // Interior: 에셋 이미지 자체가 위치에서 뿅 등장
+        // Interior: 잔디밭 위에 세워진 에셋 패널
         const interior = new THREE.Group();
         interior.position.copy(data.position);
 
         if (data.previewImage) {
-            const preview = this._createPreviewPlane(data.previewImage, 2.55, 1.85, {
-                frameColor: 0xffffff,
-                y: 1.02,
-                z: 0.02,
+            const preview = this._createPreviewPlane(data.previewImage, 3.1, 2.35, {
+                y: 1.16,
+                z: 0,
                 rotateX: 0,
-                shadowOpacity: 0.18
+                shadowOpacity: 0.18,
+                standing: true
             });
-            preview.rotation.x = -0.16;
             interior.add(preview);
         }
 
@@ -198,16 +197,19 @@ class ThemePark {
         const group = new THREE.Group();
         const texture = this._getPreviewTexture(path);
 
-        const shadow = new THREE.Mesh(
-            new THREE.PlaneGeometry(width * 0.92, height * 0.86),
-            new THREE.MeshBasicMaterial({
-                color: 0x000000,
-                transparent: true,
-                opacity: options.shadowOpacity || 0.16
-            })
-        );
-        shadow.position.set(0.08, -0.08, -0.02);
-        group.add(shadow);
+        if (options.standing) {
+            const groundShadow = new THREE.Mesh(
+                new THREE.PlaneGeometry(width * 0.78, height * 0.28),
+                new THREE.MeshBasicMaterial({
+                    color: 0x1b3a20,
+                    transparent: true,
+                    opacity: options.shadowOpacity || 0.18
+                })
+            );
+            groundShadow.rotation.x = -Math.PI / 2;
+            groundShadow.position.set(0, 0.03, 0.22);
+            group.add(groundShadow);
+        }
 
         const image = new THREE.Mesh(
             new THREE.PlaneGeometry(width, height),
@@ -215,6 +217,7 @@ class ThemePark {
                 map: texture,
                 color: 0xffffff,
                 transparent: true,
+                alphaTest: 0.04,
                 side: THREE.DoubleSide
             })
         );
@@ -223,6 +226,11 @@ class ThemePark {
 
         group.position.set(0, options.y || 0, options.z || 0);
         group.rotation.x = options.rotateX || 0;
+
+        if (options.standing) {
+            image.position.y = height * 0.08;
+        }
+
         return group;
     }
 
@@ -513,10 +521,6 @@ class ThemePark {
     }
 
     _addFloorLamp(r, x, y, z) {
-        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.2, 6),
-            new THREE.MeshStandardMaterial({ color: 0x888888 }));
-        pole.position.set(x, y + 0.6, z);
-        r.add(pole);
         const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.12, 0.2, 8),
             new THREE.MeshStandardMaterial({ color: 0xfff5cc }));
         shade.position.set(x, y + 1.25, z);
@@ -568,17 +572,6 @@ class ThemePark {
             this.group.add(tree);
         });
 
-        // 가로등 4개
-        [[- 2.5, -5],[2.5, -5],[-2.5, 2],[2.5, 2]].forEach(([x, z]) => {
-            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, 2.5, 6),
-                new THREE.MeshStandardMaterial({ color: 0x666666 }));
-            pole.position.set(x, 1.25, z);
-            this.group.add(pole);
-            const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6),
-                new THREE.MeshBasicMaterial({ color: 0xfff8dc }));
-            bulb.position.set(x, 2.6, z);
-            this.group.add(bulb);
-        });
     }
 
     _createEntryArch() {

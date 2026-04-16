@@ -1,14 +1,14 @@
 import { useEffect, useRef } from 'react'
 import { LoadingManager, TextureLoader } from 'three'
-import type { Mesh, MeshStandardMaterial } from 'three'
+import type { Mesh, MeshBasicMaterial, MeshStandardMaterial } from 'three'
 import { useLandingStore } from '@/features/landing/landingStore'
 
 // DefaultLoadingManager와 격리 — useProgress(drei)에 영향 없음
 const isolatedManager = new LoadingManager()
 
 const SLOT_Y = 0.016
-const PAPER_HALF_H = 0.19
-export const FULL_EXTENDED_Y = SLOT_Y + PAPER_HALF_H * 1.1
+const PAPER_HALF_H = 0.31
+export const FULL_EXTENDED_Y = SLOT_Y + PAPER_HALF_H * 1.08
 
 /**
  * 온보딩 printing 단계 전용 훅.
@@ -32,8 +32,14 @@ export function useOnboardingPrinterInteraction(
 
     new TextureLoader(isolatedManager).load(drawnImageUrl, (texture) => {
       if (paperRef.current) {
-        const mat = paperRef.current.material as MeshStandardMaterial
+        const mat = paperRef.current.material as MeshStandardMaterial | MeshBasicMaterial
         mat.map = texture
+        if ('color' in mat) {
+          mat.color.set('#efe4cc')
+        }
+        if ('toneMapped' in mat) {
+          mat.toneMapped = false
+        }
         mat.needsUpdate = true
       }
 

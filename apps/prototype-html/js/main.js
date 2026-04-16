@@ -154,9 +154,15 @@ class NemonicTourApp {
 
     _playThemeParkArrival() {
         const whiteout = document.getElementById('whiteout');
+        const whiteoutText = whiteout.querySelector('.whiteout-text');
         whiteout.classList.remove('hidden');
-        whiteout.style.background = '#ffffff';
+        whiteout.style.background = '#000000';
         whiteout.style.opacity = '1';
+        if (whiteoutText) {
+            whiteoutText.textContent = 'Nemonic World';
+            whiteoutText.style.opacity = '1';
+            whiteoutText.style.transform = 'translateY(0)';
+        }
 
         if (this.character) {
             this.character.isActive = false;
@@ -174,18 +180,28 @@ class NemonicTourApp {
                 }
                 Utils.hide('whiteout');
                 whiteout.style.background = '';
+                if (whiteoutText) {
+                    whiteoutText.style.opacity = '0';
+                    whiteoutText.style.transform = 'translateY(14px)';
+                }
             }
         })
+            .to(whiteoutText, {
+                duration: 0.28,
+                opacity: 0,
+                y: -10,
+                ease: 'power2.in'
+            }, 0.2)
             .to(whiteout, {
-                duration: 0.65,
+                duration: 0.55,
                 opacity: 0,
                 ease: 'power2.out'
-            }, 0.05)
+            }, 0.45)
             .to(this.character.group.position, {
                 duration: 0.9,
                 y: 0,
                 ease: 'bounce.out'
-            }, 0.05)
+            }, 0.18)
             .to(this.activeCamera.position, {
                 duration: 1.0,
                 y: 15,
@@ -198,7 +214,7 @@ class NemonicTourApp {
                         this.character.group.position.z
                     );
                 }
-            }, 0.05);
+            }, 0.18);
     }
 
     _animate() {

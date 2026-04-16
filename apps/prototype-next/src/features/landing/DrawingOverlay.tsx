@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from 'motion/react'
 import { useLandingStore } from './landingStore'
+import type { DrawnLine } from './landingStore'
 import DrawingCanvas from './DrawingCanvas'
 
 const CANVAS_SIZE = 320
@@ -10,9 +11,11 @@ export default function DrawingOverlay() {
   const onboardingStep = useLandingStore((s) => s.onboardingStep)
   const setOnboardingStep = useLandingStore((s) => s.setOnboardingStep)
   const setDrawnImageUrl = useLandingStore((s) => s.setDrawnImageUrl)
+  const setDrawnLines = useLandingStore((s) => s.setDrawnLines)
 
-  const handleExport = (dataUrl: string) => {
+  const handleExport = (dataUrl: string, lines: DrawnLine[]) => {
     setDrawnImageUrl(dataUrl)
+    setDrawnLines(lines)
     setOnboardingStep('camera-aim')
   }
 

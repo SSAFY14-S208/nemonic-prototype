@@ -193,32 +193,6 @@ class NemonicScene {
         this.stars = new THREE.Points(cloudGeo, cloudMat);
         this.scene.add(this.stars);
 
-        // 양쪽 가로등 (테마파크 스타일)
-        for (let side = -1; side <= 1; side += 2) {
-            for (let i = 0; i < 5; i++) {
-                const poleGeo = new THREE.CylinderGeometry(0.06, 0.08, 2.5, 8);
-                const poleMat = new THREE.MeshStandardMaterial({
-                    color: 0x8B4513, roughness: 0.7, metalness: 0.2
-                });
-                const pole = new THREE.Mesh(poleGeo, poleMat);
-                pole.position.set(side * 2.5, 1.25, 6 - i * 3);
-                pole.castShadow = true;
-                this.scene.add(pole);
-
-                // 가로등 상단 구체 (밝은 파스텔)
-                const lampGeo = new THREE.SphereGeometry(0.15, 12, 12);
-                const lampMat = new THREE.MeshStandardMaterial({
-                    color: side > 0 ? 0xFFD700 : 0xFF9800,
-                    emissive: side > 0 ? 0xFFD700 : 0xFF9800,
-                    emissiveIntensity: 0.5,
-                    roughness: 0.3
-                });
-                const lamp = new THREE.Mesh(lampGeo, lampMat);
-                lamp.position.set(side * 2.5, 2.6, 6 - i * 3);
-                this.scene.add(lamp);
-            }
-        }
-
         // 꽃 장식 (기기 주변에서 충분히 먼 곳에만)
         const flowerColors = [0xFF69B4, 0xFFEB3B, 0xFF5722, 0x9C27B0, 0xE91E63];
         for (let i = 0; i < 25; i++) {

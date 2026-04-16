@@ -1,4 +1,4 @@
-// ===== Stage 4: 고정된 문구멍 뒤의 원형 소용돌이 + 오른쪽 경첩 문짝 =====
+// ===== Stage 4: 문 내부 전체를 채우는 소용돌이 + 오른쪽 경첩 문짝 =====
 class Stage4Attach {
     constructor(app) {
         this.app = app;
@@ -6,12 +6,14 @@ class Stage4Attach {
         this._vortexMeshes = [];
         this._vortexLayers = [];
         this._vortexFrameId = null;
+        this._portalReveal = 0;
         this._parts = null;
         this.app._stage4 = this;
     }
 
     async start(memo) {
         this._doorPos = this.app._doorPos;
+        this._portalReveal = 0;
         if (memo) memo.visible = false;
         await Utils.delay(120);
         const parts = await this._buildDoorFromMemo(memo);
@@ -144,51 +146,22 @@ class Stage4Attach {
                 }
 
                 const significant = components.filter((component) => component.area > Math.max(60, W * H * 0.002));
-                const sortedByX = (significant.length ? significant : components).slice().sort((a, b) => a.cx - b.cx);
-                const doorSeed = sortedByX[sortedByX.length - 1] || null;
-
-                let splitX = doorSeed
-                    ? doorSeed.minX + (doorSeed.maxX - doorSeed.minX) * 0.12
-                    : (minX + maxX) * 0.58;
-                splitX = Math.max(minX + 2, Math.min(maxX - 2, splitX));
-
-                let portalPixels = [];
-                let doorPixels = [];
-                for (let i = 0; i < W * H; i++) {
-                    if (!inside[i]) continue;
-                    const x = i % W;
-                    if (x < splitX) portalPixels.push(i);
-                    else doorPixels.push(i);
-                }
-
-                if (!portalPixels.length || !doorPixels.length) {
-                    portalPixels = [];
-                    doorPixels = [];
-                    const fallbackSplit = (minX + maxX) / 2;
-                    for (let i = 0; i < W * H; i++) {
-                        if (!inside[i]) continue;
-                        const x = i % W;
-                        if (x < fallbackSplit) portalPixels.push(i);
-                        else doorPixels.push(i);
-                    }
-                }
-
-                const portalComponent = analyzePixels(portalPixels) || sortedByX[0] || null;
-                const doorComponent = analyzePixels(doorPixels) || doorSeed || portalComponent;
+                const activeComponent = (significant.length ? significant : components)
+                    .slice()
+                    .sort((a, b) => b.area - a.area)[0];
 
                 const dp = this._doorPos;
                 const memoW = 0.85 * memo.scale.x;
                 const memoH = 0.85 * memo.scale.y;
-                const centerX = (minX + maxX) / 2;
-                const centerY = (minY + maxY) / 2;
-                const activePortal = portalComponent || doorComponent;
+                const centerX = activeComponent ? (activeComponent.minX + activeComponent.maxX) / 2 : (minX + maxX) / 2;
+                const centerY = activeComponent ? (activeComponent.minY + activeComponent.maxY) / 2 : (minY + maxY) / 2;
                 const bounds = {
                     cx: centerX / W,
                     cy: centerY / H,
-                    w: Math.max((activePortal.maxX - activePortal.minX) / W, 0.05),
-                    h: Math.max((activePortal.maxY - activePortal.minY) / H, 0.05),
-                    left: (doorComponent ? doorComponent.minX : minX) / W,
-                    right: (doorComponent ? doorComponent.maxX : maxX) / W
+                    w: Math.max((activeComponent.maxX - activeComponent.minX) / W, 0.05),
+                    h: Math.max((activeComponent.maxY - activeComponent.minY) / H, 0.05),
+                    left: (activeComponent ? activeComponent.minX : minX) / W,
+                    right: (activeComponent ? activeComponent.maxX : maxX) / W
                 };
                 bounds.portalWorldX = dp.x + (bounds.cx - 0.5) * memoW;
                 bounds.portalWorldY = dp.y - (bounds.cy - 0.5) * memoH;
@@ -213,8 +186,7 @@ class Stage4Attach {
                     return canvas;
                 };
 
-                const portalMaskCanvas = makeMaskCanvas(portalComponent);
-                const doorMaskCanvas = makeMaskCanvas(doorComponent);
+                const fullMaskCanvas = makeMaskCanvas(activeComponent);
 
                 const outlineCanvas = document.createElement('canvas');
                 outlineCanvas.width = W;
@@ -257,6 +229,7 @@ class Stage4Attach {
                         opacity: 1
                     })
                 );
+                frameMesh.renderOrder = 18;
                 frameMesh.position.set(dp.x, dp.y, dp.z + 0.012);
                 this.scene.scene.add(frameMesh);
 
@@ -264,10 +237,10 @@ class Stage4Attach {
                 doorCanvas.width = W;
                 doorCanvas.height = H;
                 const dctx = doorCanvas.getContext('2d');
-                dctx.fillStyle = '#e8e4d8';
+                dctx.fillStyle = '#ffffff';
                 dctx.fillRect(0, 0, W, H);
                 dctx.globalCompositeOperation = 'destination-in';
-                dctx.drawImage(doorMaskCanvas, 0, 0);
+                dctx.drawImage(fullMaskCanvas, 0, 0);
                 dctx.globalCompositeOperation = 'source-over';
                 dctx.drawImage(outlineCanvas, 0, 0);
 
@@ -278,17 +251,18 @@ class Stage4Attach {
 
                 const doorMesh = new THREE.Mesh(
                     new THREE.PlaneGeometry(memoW, memoH),
-                    new THREE.MeshStandardMaterial({
+                    new THREE.MeshBasicMaterial({
                         map: doorTex,
-                        color: 0xe8e4d8,
+                        color: 0xd8d2c4,
                         transparent: true,
+                        alphaTest: 0.04,
+                        depthWrite: true,
                         side: THREE.DoubleSide,
-                        roughness: 0.4,
-                        metalness: 0.0
                     })
                 );
+                doorMesh.renderOrder = 16;
 
-                const vortexLayers = this._createVortexLayers(bounds, memoW, memoH, dp, portalMaskCanvas);
+                const vortexLayers = this._createVortexLayers(bounds, memoW, memoH, dp, fullMaskCanvas);
                 vortexLayers.forEach((mesh) => {
                     mesh.visible = false;
                 });
@@ -309,7 +283,10 @@ class Stage4Attach {
         this._vortexLayers = [];
         const W = maskCanvas.width;
         const H = maskCanvas.height;
-        const radius = Math.max(Math.max(bounds.w, bounds.h) * Math.max(W, H) * 1.05, Math.max(W, H) * 0.8);
+        const radius = Math.max(
+            Math.max(bounds.w, bounds.h) * Math.max(W, H) * 1.35,
+            Math.max(W, H) * 1.05
+        );
         const maskTex = new THREE.Texture(maskCanvas);
         maskTex.minFilter = THREE.LinearFilter;
         maskTex.magFilter = THREE.LinearFilter;
@@ -332,20 +309,24 @@ class Stage4Attach {
             this._vortexLayers.push(info);
             this._paintVortexLayer(info, 0);
 
-                const mesh = new THREE.Mesh(
-                    new THREE.PlaneGeometry(memoW, memoH),
-                    new THREE.MeshBasicMaterial({
-                        map: texture,
-                        alphaMap: maskTex,
-                        transparent: true,
-                        depthWrite: false,
-                        polygonOffset: true,
-                        polygonOffsetFactor: 1,
-                        polygonOffsetUnits: 1,
-                        side: THREE.DoubleSide,
-                        opacity: layer === 0 ? 1 : 0.74 - layer * 0.12
-                    })
-                );
+            const baseOpacity = Math.max(0.82 - layer * 0.16, 0.28);
+
+            const mesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(memoW, memoH),
+                new THREE.MeshBasicMaterial({
+                    map: texture,
+                    alphaMap: maskTex,
+                    transparent: true,
+                    depthWrite: false,
+                    polygonOffset: true,
+                    polygonOffsetFactor: 1,
+                    polygonOffsetUnits: 1,
+                    side: THREE.DoubleSide,
+                    opacity: 0
+                })
+            );
+            mesh.userData.baseOpacity = baseOpacity;
+            mesh.renderOrder = 4 + layer;
             mesh.position.set(dp.x, dp.y, dp.z + 0.001 - layer * 0.0015);
             this.scene.scene.add(mesh);
             layers.push(mesh);
@@ -359,57 +340,66 @@ class Stage4Attach {
         const { ctx, canvas, radius, layer, texture, cx, cy } = layerInfo;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        const bg = ctx.createRadialGradient(cx, cy, radius * 0.04, cx, cy, radius);
-        bg.addColorStop(0, 'rgba(8,6,34,1)');
-        bg.addColorStop(0.15, 'rgba(28,18,82,0.98)');
-        bg.addColorStop(0.34, 'rgba(73,48,151,0.96)');
-        bg.addColorStop(0.62, 'rgba(109,82,205,0.92)');
-        bg.addColorStop(0.86, 'rgba(71,111,223,0.76)');
-        bg.addColorStop(1, 'rgba(28,84,189,0.28)');
+        const bg = ctx.createRadialGradient(cx, cy, radius * 0.03, cx, cy, radius);
+        bg.addColorStop(0, 'rgba(6,4,18,1)');
+        bg.addColorStop(0.18, 'rgba(22,14,62,0.98)');
+        bg.addColorStop(0.44, 'rgba(58,36,132,0.94)');
+        bg.addColorStop(0.72, 'rgba(102,74,178,0.82)');
+        bg.addColorStop(1, 'rgba(34,18,82,0.24)');
         ctx.fillStyle = bg;
         ctx.beginPath();
         ctx.arc(cx, cy, radius, 0, Math.PI * 2);
         ctx.fill();
 
         const arms = 8;
-        const offsetSpin = time * (0.72 + layer * 0.18) * (layer % 2 === 0 ? 1 : -1);
+        const offsetSpin = time * (0.46 + layer * 0.12) * (layer % 2 === 0 ? 1 : -1);
         for (let arm = 0; arm < arms; arm++) {
             const offset = (arm / arms) * Math.PI * 2 + offsetSpin + layer * 0.12;
             ctx.beginPath();
             for (let t = 0; t <= 1; t += 0.003) {
-                const angle = offset + t * Math.PI * (5.7 + layer * 0.24);
-                const r = 2 + Math.pow(t, 0.88) * radius;
+                const angle = offset + t * Math.PI * (4.5 + layer * 0.18);
+                const r = 2 + Math.pow(t, 0.9) * radius;
                 const x = cx + Math.cos(angle) * r;
                 const y = cy + Math.sin(angle) * r;
                 if (t === 0) ctx.moveTo(x, y);
                 else ctx.lineTo(x, y);
             }
             ctx.strokeStyle = layer % 2 === 0
-                ? `rgba(237,228,255,${0.88 - layer * 0.11})`
-                : `rgba(121,165,255,${0.72 - layer * 0.09})`;
-            ctx.lineWidth = 22 - layer * 2.5;
+                ? `rgba(228,214,255,${0.52 - layer * 0.08})`
+                : `rgba(143,108,255,${0.34 - layer * 0.06})`;
+            ctx.lineWidth = 18 - layer * 1.6;
             ctx.lineCap = 'round';
             ctx.stroke();
         }
 
         const innerGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius * 0.5);
-        innerGlow.addColorStop(0, 'rgba(255,255,255,0.08)');
-        innerGlow.addColorStop(0.35, 'rgba(177,150,255,0.22)');
-        innerGlow.addColorStop(0.75, 'rgba(58,36,147,0.1)');
-        innerGlow.addColorStop(1, 'rgba(58,36,147,0)');
+        innerGlow.addColorStop(0, 'rgba(255,255,255,0.05)');
+        innerGlow.addColorStop(0.34, 'rgba(182,148,255,0.2)');
+        innerGlow.addColorStop(0.72, 'rgba(75,40,154,0.08)');
+        innerGlow.addColorStop(1, 'rgba(75,40,154,0)');
         ctx.fillStyle = innerGlow;
         ctx.beginPath();
         ctx.arc(cx, cy, radius * 0.9, 0, Math.PI * 2);
         ctx.fill();
 
         const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius * 0.28);
-        core.addColorStop(0, 'rgba(2,2,14,1)');
-        core.addColorStop(0.45, 'rgba(13,9,42,0.94)');
-        core.addColorStop(1, 'rgba(13,9,42,0)');
+        core.addColorStop(0, 'rgba(3,2,10,1)');
+        core.addColorStop(0.44, 'rgba(10,6,28,0.95)');
+        core.addColorStop(1, 'rgba(10,6,28,0)');
         ctx.fillStyle = core;
         ctx.beginPath();
         ctx.arc(cx, cy, radius * 0.34, 0, Math.PI * 2);
         ctx.fill();
+
+        const rim = ctx.createRadialGradient(cx, cy, radius * 0.74, cx, cy, radius);
+        rim.addColorStop(0, 'rgba(0,0,0,0)');
+        rim.addColorStop(0.6, 'rgba(180,150,255,0.12)');
+        rim.addColorStop(1, 'rgba(236,225,255,0.46)');
+        ctx.strokeStyle = rim;
+        ctx.lineWidth = 10 - layer;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius * 0.92, 0, Math.PI * 2);
+        ctx.stroke();
 
         texture.needsUpdate = true;
     }
@@ -446,10 +436,24 @@ class Stage4Attach {
         this._startSpin();
 
         return new Promise(resolve => {
-            gsap.timeline({ onComplete: resolve })
-                .set(this._vortexMeshes, { visible: true }, 0.08)
+            const revealState = { amount: 0 };
+            gsap.timeline({
+                onComplete: () => {
+                    this._portalReveal = 1;
+                    resolve();
+                }
+            })
+                .set(this._vortexMeshes, { visible: true }, 0.1)
+                .to(revealState, {
+                    duration: 0.42,
+                    amount: 1,
+                    ease: 'power2.out',
+                    onUpdate: () => {
+                        this._portalReveal = revealState.amount;
+                    }
+                }, 0.16)
                 .to(hingePivot.rotation, {
-                    duration: 1.7,
+                    duration: 1.55,
                     y: Math.PI * 2 / 3,
                     ease: 'power2.inOut'
                 }, 0);
@@ -465,13 +469,15 @@ class Stage4Attach {
                 if (this._vortexLayers[index]) {
                     this._paintVortexLayer(this._vortexLayers[index], time);
                 }
-                mesh.material.opacity = 0.56 + Math.sin(time * 3 + index) * 0.06;
+                const baseOpacity = mesh.userData.baseOpacity || 0.5;
+                mesh.material.opacity = baseOpacity * this._portalReveal * (0.94 + Math.sin(time * 2.3 + index) * 0.04);
             });
         };
         tick();
     }
 
     stopEffects() {
+        this._portalReveal = 0;
         if (this._vortexFrameId) {
             cancelAnimationFrame(this._vortexFrameId);
             this._vortexFrameId = null;

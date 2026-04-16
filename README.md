@@ -45,8 +45,10 @@ npm run html
 
 ```bash
 cd /Users/sondahyun/nemonic-prototype/apps/prototype-next
-npm install
-npm run dev
+corepack enable
+corepack prepare pnpm@latest --activate
+pnpm install
+pnpm dev
 ```
 
 브라우저에서 `http://localhost:3000` 접속
@@ -64,6 +66,6 @@ npm run dev
 ```bash
 cd /Users/sondahyun/nemonic-prototype
 npm run html
-npm run portfolio:install
-npm run portfolio:dev
+npm run next:install
+npm run next:dev
 ```

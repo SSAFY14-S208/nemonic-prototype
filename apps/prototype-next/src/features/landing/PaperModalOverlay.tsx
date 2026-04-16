@@ -5,10 +5,13 @@ import { useLandingStore } from './landingStore'
 
 export default function PaperModalOverlay() {
   const onboardingStep = useLandingStore((s) => s.onboardingStep)
+  const message = onboardingStep === 'attaching'
+    ? '문을 네모닉에 붙이고 있어요!'
+    : '출력된 라벨지를 클릭해 뜯어보세요!'
 
   return (
     <AnimatePresence>
-      {onboardingStep === 'paper-modal' && (
+      {(onboardingStep === 'paper-modal' || onboardingStep === 'attaching') && (
         <motion.div
           initial={{ y: -60, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -24,7 +27,7 @@ export default function PaperModalOverlay() {
             className="text-white text-2xl font-semibold drop-shadow-lg select-none"
             style={{ textShadow: '0 2px 12px rgba(0,0,0,0.5)' }}
           >
-            문을 달아 네모닉 월드로 들어가봐요!
+            {message}
           </motion.p>
 
           {/* 클릭 힌트 */}
@@ -33,7 +36,7 @@ export default function PaperModalOverlay() {
             transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
             className="mt-3 text-white/70 text-sm select-none"
           >
-            그림을 클릭하세요
+            {onboardingStep === 'attaching' ? '잠시만 기다려주세요' : '출력된 종이를 클릭하세요'}
           </motion.p>
         </motion.div>
       )}

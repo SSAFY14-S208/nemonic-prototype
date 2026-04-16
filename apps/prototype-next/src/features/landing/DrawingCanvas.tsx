@@ -2,16 +2,17 @@
 
 import { Stage, Layer, Line, Rect } from 'react-konva'
 import { useDrawingCanvas } from './useDrawingCanvas'
+import type { DrawnLine } from './landingStore'
 
 interface DrawingCanvasProps {
   width: number
   height: number
-  onExport: (dataUrl: string) => void
+  onExport: (dataUrl: string, lines: DrawnLine[]) => void
   onClear: () => void
 }
 
 export default function DrawingCanvas({ width, height, onExport, onClear }: DrawingCanvasProps) {
-  const { stageRef, lines, handleMouseDown, handleMouseMove, handleMouseUp, clearCanvas, exportImage } =
+  const { stageRef, lines, handleMouseDown, handleMouseMove, handleMouseUp, clearCanvas, exportImage, exportLines } =
     useDrawingCanvas()
 
   const handleClear = () => {
@@ -21,7 +22,7 @@ export default function DrawingCanvas({ width, height, onExport, onClear }: Draw
 
   const handleComplete = () => {
     const url = exportImage()
-    if (url) onExport(url)
+    if (url) onExport(url, exportLines())
   }
 
   return (

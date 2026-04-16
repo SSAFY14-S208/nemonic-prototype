@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Shape } from 'three'
+import type { ThreeEvent } from '@react-three/fiber'
 import { usePrinterInteraction } from '../usePrinterInteraction'
 import { useOnboardingPrinterInteraction } from '../useOnboardingPrinterInteraction'
 import { useLandingStore } from '@/features/landing/landingStore'
@@ -15,9 +16,10 @@ const WT = 0.025  // 벽 두께
 
 interface PrinterMeshProps {
   onPrint?: () => void
+  onPeelPaper?: () => void
 }
 
-export default function PrinterMesh({ onPrint }: PrinterMeshProps) {
+export default function PrinterMesh({ onPrint, onPeelPaper }: PrinterMeshProps) {
   const { paperRef, lidGroupRef, isPrinting, lidOpen, handleButtonPress, handleLidToggle, setTargetY, HIDDEN_Y, toggleButtonRef } =
     usePrinterInteraction()
 
@@ -26,7 +28,16 @@ export default function PrinterMesh({ onPrint }: PrinterMeshProps) {
 
   const [buttonHovered, setButtonHovered] = useState(false)
   const [lidBtnHovered, setLidBtnHovered] = useState(false)
+  const [paperHovered, setPaperHovered] = useState(false)
+  const [paperTaken, setPaperTaken] = useState(false)
   const onboardingStep = useLandingStore((s) => s.onboardingStep)
+
+  useEffect(() => {
+    if (onboardingStep === 'printing') {
+      const id = requestAnimationFrame(() => setPaperTaken(false))
+      return () => cancelAnimationFrame(id)
+    }
+  }, [onboardingStep])
 
   // sparkle light intensity (state으로 리렌더 유발)
   const [sparkleIntensity, setSparkleIntensity] = useState(0)
@@ -66,8 +77,22 @@ export default function PrinterMesh({ onPrint }: PrinterMeshProps) {
   const handleTriangleClick = () => {
     if (onboardingStep === 'print-ready' && onPrint) {
       onPrint()
-    } else {
+    } else if (onboardingStep === 'idle') {
       handleButtonPress()
+    }
+  }
+
+  const handlePaperClick = (e: { stopPropagation: () => void }) => {
+    e.stopPropagation()
+    if (onboardingStep !== 'paper-modal' || paperTaken) return
+    setPaperTaken(true)
+    onPeelPaper?.()
+  }
+
+  const canUseTriangle = onboardingStep === 'idle' || onboardingStep === 'print-ready'
+  const handleTrianglePointerDown = (e: ThreeEvent<PointerEvent>) => {
+    if (!canUseTriangle) {
+      e.stopPropagation()
     }
   }
 
@@ -134,7 +159,7 @@ export default function PrinterMesh({ onPrint }: PrinterMeshProps) {
             {/* 상판 */}
             <mesh position={[0, 0.005, 0]} receiveShadow>
               <boxGeometry args={[BW, 0.01, BD]} />
-              <meshStandardMaterial color="gray" roughness={0.4} />
+              <meshStandardMaterial color="#ddd6cb" roughness={0.92} metalness={0.01} />
             </mesh>
 
             {/* 슬릿 + 라벨지 그룹 — Z=0.3 공통 관리 */}
@@ -146,22 +171,51 @@ export default function PrinterMesh({ onPrint }: PrinterMeshProps) {
               </mesh>
 
               {/* 라벨지 */}
-              <mesh ref={paperRef} position={[0, HIDDEN_Y, 0]}>
-                <boxGeometry args={[0.80, 0.38, 0.003]} />
-                <meshStandardMaterial color="#fff8f6" roughness={0.85} />
+              <mesh
+                ref={paperRef}
+                position={[0, HIDDEN_Y, 0]}
+                visible={!paperTaken}
+                onPointerDown={(e) => {
+                  e.stopPropagation()
+                }}
+                onClick={handlePaperClick}
+                onPointerEnter={(e) => {
+                  e.stopPropagation()
+                  if (onboardingStep !== 'paper-modal' || paperTaken) return
+                  document.body.style.cursor = 'pointer'
+                  setPaperHovered(true)
+                }}
+                onPointerLeave={(e) => {
+                  e.stopPropagation()
+                  if (onboardingStep !== 'paper-modal') return
+                  document.body.style.cursor = 'auto'
+                  setPaperHovered(false)
+                }}
+              >
+                <boxGeometry args={[0.62, 0.62, 0.003]} />
+                <meshStandardMaterial
+                  color="#efe4cc"
+                  roughness={0.98}
+                  metalness={0}
+                  toneMapped={false}
+                  emissive={paperHovered ? '#777777' : '#000000'}
+                  emissiveIntensity={paperHovered ? 0.12 : 0}
+                />
               </mesh>
             </group>
 
-            {/* 삼각형 버튼 그룹 — 상판 우측 전면 모서리 */}
-            <group
-              position={[BW / 2, 0.003, BD / 2]}
-              onClick={handleTriangleClick}
-              onPointerEnter={() => {
-                document.body.style.cursor = 'pointer'
-                setButtonHovered(true)
-              }}
-              onPointerLeave={() => {
-                document.body.style.cursor = 'auto'
+              {/* 삼각형 버튼 그룹 — 상판 우측 전면 모서리 */}
+              <group
+                position={[BW / 2, 0.003, BD / 2]}
+                onPointerDown={handleTrianglePointerDown}
+                onClick={canUseTriangle ? handleTriangleClick : undefined}
+                onPointerEnter={() => {
+                  if (!canUseTriangle) return
+                  document.body.style.cursor = 'pointer'
+                  setButtonHovered(true)
+                }}
+                onPointerLeave={() => {
+                  document.body.style.cursor = 'auto'
                 setButtonHovered(false)
               }}
             >

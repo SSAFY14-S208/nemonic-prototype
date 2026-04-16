@@ -8,7 +8,14 @@ export type OnboardingStep =
   | 'print-ready'
   | 'printing'
   | 'paper-modal'
+  | 'attaching'
   | 'entering'
+
+export interface DrawnLine {
+  points: number[]
+  color: string
+  width: number
+}
 
 interface LandingStore {
   isExploreMode: boolean
@@ -17,6 +24,8 @@ interface LandingStore {
   setOnboardingStep: (s: OnboardingStep) => void
   drawnImageUrl: string | null
   setDrawnImageUrl: (url: string | null) => void
+  drawnLines: DrawnLine[]
+  setDrawnLines: (lines: DrawnLine[]) => void
 }
 
 export const useLandingStore = create<LandingStore>((set) => ({
@@ -26,4 +35,6 @@ export const useLandingStore = create<LandingStore>((set) => ({
   setOnboardingStep: (s) => set({ onboardingStep: s }),
   drawnImageUrl: null,
   setDrawnImageUrl: (url) => set({ drawnImageUrl: url }),
+  drawnLines: [],
+  setDrawnLines: (lines) => set({ drawnLines: lines }),
 }))

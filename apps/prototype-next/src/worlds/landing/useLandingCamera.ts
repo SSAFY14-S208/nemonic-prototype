@@ -4,16 +4,17 @@ import { Vector3 } from 'three'
 import { useLandingStore } from '@/features/landing/landingStore'
 import { useSceneStore } from '@/shared/store'
 
-// top-down 45° — 프린터 위에서 내려다보는 시점
-const AIM_POS = new Vector3(0, 2.0, 2.0)
-const AIM_LOOKAT = new Vector3(0, 0.35, 0)
+// 출력된 라벨지가 전부 보이도록, 기존보다 약간 뒤로 물러난 3/4 시점
+const AIM_POS = new Vector3(0, 1.52, 2.18)
+const AIM_LOOKAT = new Vector3(0, 0.78, 0.12)
 
-// 프린터 정면 고정
-const FRONT_POS = new Vector3(0, 0.7, 2.5)
-const FRONT_LOOKAT = new Vector3(0, 0.5, 0)
+// 문 열림이 보이도록 살짝 오른쪽 3/4 시점
+const FRONT_POS = new Vector3(0.42, 0.7, 1.95)
+const FRONT_LOOKAT = new Vector3(0, 0.52, 0.02)
 
-// 슬릿으로 빨려들어가는 최종 위치
-const SUCK_TARGET = new Vector3(0, 0.5, 0.6)
+// 문 속으로 빨려들어가는 최종 위치
+const SUCK_TARGET = new Vector3(0, 0.4, 0.58)
+const SUCK_LOOKAT = new Vector3(0, 0.38, 0.35)
 
 function easeInOut(t: number) {
   return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
@@ -101,7 +102,7 @@ export function useLandingCamera() {
       progress.current += delta
       const speed = 0.04 + progress.current * progress.current * 0.5
       camera.position.lerp(SUCK_TARGET, Math.min(speed, 0.9))
-      camera.lookAt(FRONT_LOOKAT)
+      camera.lookAt(SUCK_LOOKAT)
 
       if (camera.position.distanceTo(SUCK_TARGET) < 0.12) {
         phase.current = 'idle'

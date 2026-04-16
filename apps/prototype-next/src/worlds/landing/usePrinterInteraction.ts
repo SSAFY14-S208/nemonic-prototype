@@ -4,10 +4,10 @@ import type { Group, Mesh } from 'three'
 
 // 뚜껑 inner group의 world Y = 0.7 기준 로컬 좌표
 const SLOT_Y = 0.016
-const PAPER_HALF_H = 0.19
+const PAPER_HALF_H = 0.31
 
 export const HIDDEN_Y = SLOT_Y - PAPER_HALF_H - 0.01      // ≈ -0.184
-export const EXTENDED_Y = SLOT_Y + PAPER_HALF_H * 0.65    // ≈ 0.140 (65% 노출)
+export const EXTENDED_Y = SLOT_Y + PAPER_HALF_H * 0.72
 
 const LID_OPEN_ANGLE = -Math.PI * 0.72
 

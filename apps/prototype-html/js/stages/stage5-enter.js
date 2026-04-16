@@ -11,22 +11,28 @@ class Stage5Enter {
         const doorCenter = new THREE.Vector3(portal.x, portal.y, portal.z);
         const startPos = camera.position.clone();
         const travelDir = new THREE.Vector3().subVectors(doorCenter, startPos).normalize();
-        const enterPoint = doorCenter.clone().add(travelDir.clone().multiplyScalar(0.28));
-        const insidePoint = doorCenter.clone().add(travelDir.clone().multiplyScalar(1.15));
+        const enterPoint = doorCenter.clone().add(travelDir.clone().multiplyScalar(-0.58));
+        const portalPoint = doorCenter.clone().add(travelDir.clone().multiplyScalar(-0.16));
 
         const whiteout = document.getElementById('whiteout');
-        whiteout.style.background = '#ffffff';
+        const whiteoutText = whiteout.querySelector('.whiteout-text');
+        whiteout.style.background = '#000000';
         whiteout.classList.remove('hidden');
         whiteout.style.opacity = '0';
+        if (whiteoutText) {
+            whiteoutText.textContent = 'Nemonic World';
+            whiteoutText.style.opacity = '0';
+            whiteoutText.style.transform = 'translateY(14px)';
+        }
 
         // 슈우웅 소리
         this._playVortexSound();
 
-        // 문 안 소용돌이로 실제로 빨려 들어가며 점점 커 보이게 한다.
+        // 문 안으로 숙 빨려 들어간 뒤, 검정 전환 + 월드 타이틀 카드
         await new Promise(resolve => {
             const tl = gsap.timeline({ onComplete: resolve });
             tl.to(camera.position, {
-                duration: 0.48,
+                duration: 0.44,
                 x: enterPoint.x,
                 y: enterPoint.y,
                 z: enterPoint.z,
@@ -36,31 +42,35 @@ class Stage5Enter {
                 }
             }, 0)
             .to(camera.position, {
-                duration: 0.42,
-                x: insidePoint.x,
-                y: insidePoint.y,
-                z: insidePoint.z,
-                ease: 'power4.in',
+                duration: 0.28,
+                x: portalPoint.x,
+                y: portalPoint.y,
+                z: portalPoint.z,
+                ease: 'power3.inOut',
                 onUpdate: () => {
-                    const lookAhead = insidePoint.clone().add(travelDir.clone().multiplyScalar(1.8));
-                    camera.lookAt(lookAhead.x, lookAhead.y, lookAhead.z);
+                    camera.lookAt(doorCenter.x, doorCenter.y, doorCenter.z);
                 }
-            }, 0.48)
+            }, 0.44)
             .to(camera, {
-                duration: 0.9,
-                fov: 28,
+                duration: 0.72,
+                fov: 16,
                 ease: 'power3.in',
                 onUpdate: () => camera.updateProjectionMatrix()
             }, 0)
             .to(whiteout, {
-                duration: 0.12,
+                duration: 0.18,
                 opacity: 1,
                 ease: 'power2.inOut'
-            }, 0.82);
+            }, 0.58)
+            .to(whiteoutText, {
+                duration: 0.3,
+                opacity: 1,
+                y: 0,
+                ease: 'power2.out'
+            }, 0.76);
         });
 
-        // 테마파크로 전환
-        await Utils.delay(120);
+        await Utils.delay(520);
 
         // 소용돌이 애니메이션 정리
         if (this.app._stage4) {

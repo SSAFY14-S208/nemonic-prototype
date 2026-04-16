@@ -9,7 +9,7 @@ export default function WorldCanvas() {
   return (
     <Canvas
       shadows
-      camera={{ position: [2.5, 2, 3.5], fov: 50 }}
+      camera={{ position: [1.35, 1.05, 2.35], fov: 42 }}
       style={{ width: '100vw', height: '100vh' }}
       gl={{ antialias: true }}
     >
