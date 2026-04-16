@@ -272,6 +272,50 @@ html, body {
 }
 
 /* ===== 화이트아웃 (Stage 5) ===== */
+#vortex-transition {
+    position: fixed; inset: 0;
+    z-index: 290;
+    pointer-events: none;
+    opacity: 0;
+    overflow: hidden;
+}
+.vortex-transition-inner {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 36vmin;
+    height: 36vmin;
+    border-radius: 50%;
+    background:
+        radial-gradient(circle at center,
+            rgba(255,255,255,1) 0%,
+            rgba(214,240,255,0.98) 12%,
+            rgba(110,190,250,0.94) 34%,
+            rgba(34,127,220,0.9) 58%,
+            rgba(17,90,173,0.92) 78%,
+            rgba(8,46,110,1) 100%);
+    box-shadow: 0 0 60px rgba(115, 190, 255, 0.35);
+    overflow: hidden;
+    transform: scale(0.2);
+}
+.vortex-transition-inner::before,
+.vortex-transition-inner::after {
+    content: '';
+    position: absolute;
+    inset: -12%;
+    border-radius: 42%;
+    border: 18px solid rgba(255,255,255,0.22);
+    mix-blend-mode: screen;
+}
+.vortex-transition-inner::before {
+    transform: rotate(18deg);
+}
+.vortex-transition-inner::after {
+    inset: 8%;
+    border-width: 14px;
+    border-color: rgba(159, 220, 255, 0.36);
+    transform: rotate(-26deg);
+}
 #whiteout {
     position: fixed; inset: 0;
     background: #fff;

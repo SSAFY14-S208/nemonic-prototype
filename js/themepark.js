@@ -8,6 +8,8 @@ class ThemePark {
         this.isBoothOpen = false;
         this.decorObjects = [];
         this.orthoCamera = this._createOrthoCamera();
+        this.textureLoader = new THREE.TextureLoader();
+        this._previewTextureCache = new Map();
         this._build();
         this._bindBoothUI();
     }
@@ -128,23 +130,23 @@ class ThemePark {
             { name: '춘식이네 집', icon: '🏠', color: 0xff4040, roofColor: 0xe52525,
               position: new THREE.Vector3(-7, 0, -6), gameType: 'yang',
               desc: '아늑한 거실에서 양세찬 게임을 즐겨보세요!', action: '게임 시작',
-              theme: 'home' },
+              theme: 'home', previewImage: 'assets/relay-drawing.png' },
             { name: '망고 오피스', icon: '🏢', color: 0x2196F3, roofColor: 0x1565C0,
               position: new THREE.Vector3(7, 0, -6), gameType: null,
               desc: '망고슬래브 사무실에서 오늘의 운세를 확인하세요!', action: '운세 보기',
-              theme: 'office' },
+              theme: 'office', previewImage: 'assets/fortune-cookie.png' },
             { name: '네모닉 볼링장', icon: '🎳', color: 0x9C27B0, roofColor: 0x7B1FA2,
               position: new THREE.Vector3(-7, 0, 4), gameType: null,
               desc: '오답노트를 만들어 실력을 키워보세요!', action: '사진 업로드',
-              theme: 'bowling' },
+              theme: 'bowling', previewImage: 'assets/flipbook.jpeg' },
             { name: '네모 PC방', icon: '🖥️', color: 0xFFB300, roofColor: 0xF57F17,
               position: new THREE.Vector3(7, 0, 4), gameType: null,
               desc: 'AI로 나만의 커스텀 스티커를 만들어보세요!', action: '스티커 만들기',
-              theme: 'pcroom' },
+              theme: 'pcroom', previewImage: 'assets/fortune-cookie.png' },
             { name: '메모 카페', icon: '☕', color: 0x00C853, roofColor: 0x00962e,
               position: new THREE.Vector3(0, 0, -9), gameType: null,
               desc: '따뜻한 카페에서 자유 메모를 작성하세요.', action: '메모 작성',
-              theme: 'cafe' }
+              theme: 'cafe', previewImage: 'assets/relay-drawing.png' }
         ];
         boothData.forEach(data => {
             const { shell, interior } = this._buildRoom(data);
@@ -155,13 +157,12 @@ class ThemePark {
         });
     }
 
-    // === 아이소메트릭 방 빌더 ===
+    // === 에셋 카드형 부스 빌더 ===
     _buildRoom(data) {
         const S = 3.8;
         const hs = S / 2;
-        const wallH = 2.5;
 
-        // Shell: 바닥 + 간판 (항상 보임, 납작)
+        // Shell: 바닥 + 간판
         const shell = new THREE.Group();
         shell.position.copy(data.position);
 
@@ -187,50 +188,7 @@ class ThemePark {
             b.position.set(...pos);
             shell.add(b);
         });
-        this.group.add(shell);
 
-        // Interior: 벽 + 소품 (뿅 등장)
-        const interior = new THREE.Group();
-        interior.position.copy(data.position);
-
-        const wallC = { home: 0xecd0a0, office: 0xb8c0d8, bowling: 0xddd0a8, pcroom: 0x222240, cafe: 0xe0d0a8 };
-        const wallMat = new THREE.MeshStandardMaterial({ color: wallC[data.theme] || 0xfff8f0, roughness: 0.8, side: THREE.DoubleSide });
-
-        // 뒷벽
-        const backWall = new THREE.Mesh(new THREE.PlaneGeometry(S, wallH), wallMat);
-        backWall.position.set(0, wallH / 2, -hs);
-        interior.add(backWall);
-        // 왼벽
-        const lw = new THREE.Mesh(new THREE.PlaneGeometry(S, wallH), wallMat);
-        lw.rotation.y = Math.PI / 2;
-        lw.position.set(-hs, wallH / 2, 0);
-        interior.add(lw);
-
-        // 벽 상단 컬러 트림
-        const trimMat = new THREE.MeshStandardMaterial({ color: data.color });
-        const bt = new THREE.Mesh(new THREE.BoxGeometry(S + 0.1, 0.08, 0.06), trimMat);
-        bt.position.set(0, wallH, -hs);
-        interior.add(bt);
-        const lt = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, S + 0.1), trimMat);
-        lt.position.set(-hs, wallH, 0);
-        interior.add(lt);
-
-        // 바닥 러그
-        const rugC = { home: 0x7ec8a0, office: 0xbbb8d0, bowling: 0xcd853f, pcroom: 0x333355, cafe: 0xd4a76a };
-        const rug = new THREE.Mesh(
-            new THREE.PlaneGeometry(S * 0.55, S * 0.45),
-            new THREE.MeshStandardMaterial({ color: rugC[data.theme] || 0xaabbcc, roughness: 0.9 })
-        );
-        rug.rotation.x = -Math.PI / 2;
-        rug.position.set(0.2, 0.03, 0.2);
-        interior.add(rug);
-
-        // 방 조명
-        const rl = new THREE.PointLight(0xfff5e0, 0.4, 5);
-        rl.position.set(0, wallH - 0.3, 0);
-        interior.add(rl);
-
-        // 간판 (뒷벽 위에 떠 있음)
         const signCanvas = document.createElement('canvas');
         signCanvas.width = 256; signCanvas.height = 64;
         const sctx = signCanvas.getContext('2d');
@@ -244,14 +202,81 @@ class ThemePark {
             new THREE.PlaneGeometry(2.0, 0.5),
             new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(signCanvas), transparent: true })
         );
-        signMesh.position.set(0, wallH + 0.4, -hs + 0.05);
-        interior.add(signMesh);
+        signMesh.position.set(0, 2.55, -hs + 0.05);
+        shell.add(signMesh);
 
-        // 테마별 소품
-        this['_room_' + data.theme](interior, hs, wallH);
+        this.group.add(shell);
+
+        // Interior: 에셋 이미지가 그대로 위로 뿅 등장
+        const interior = new THREE.Group();
+        interior.position.copy(data.position);
+
+        if (data.previewImage) {
+            const preview = this._createPreviewPlane(data.previewImage, 2.55, 1.85, {
+                frameColor: 0xffffff,
+                y: 0.96,
+                z: 0.02,
+                rotateX: 0,
+                shadowOpacity: 0.18
+            });
+            preview.rotation.x = -0.16;
+            interior.add(preview);
+        }
 
         this.group.add(interior);
         return { shell, interior };
+    }
+
+    _getPreviewTexture(path) {
+        if (!path) return null;
+        if (!this._previewTextureCache.has(path)) {
+            const tex = this.textureLoader.load(encodeURI(path));
+            tex.colorSpace = THREE.SRGBColorSpace;
+            tex.anisotropy = 4;
+            this._previewTextureCache.set(path, tex);
+        }
+        return this._previewTextureCache.get(path);
+    }
+
+    _createPreviewPlane(path, width, height, options = {}) {
+        const group = new THREE.Group();
+        const texture = this._getPreviewTexture(path);
+        const frameColor = options.frameColor || 0xffffff;
+
+        const shadow = new THREE.Mesh(
+            new THREE.PlaneGeometry(width * 0.92, height * 0.86),
+            new THREE.MeshBasicMaterial({
+                color: 0x000000,
+                transparent: true,
+                opacity: options.shadowOpacity || 0.16
+            })
+        );
+        shadow.position.set(0.08, -0.08, -0.02);
+        group.add(shadow);
+
+        const frame = new THREE.Mesh(
+            new THREE.BoxGeometry(width + 0.14, height + 0.14, 0.06),
+            new THREE.MeshStandardMaterial({
+                color: frameColor,
+                roughness: 0.5,
+                metalness: 0.02
+            })
+        );
+        group.add(frame);
+
+        const image = new THREE.Mesh(
+            new THREE.PlaneGeometry(width, height),
+            new THREE.MeshBasicMaterial({
+                map: texture,
+                transparent: true
+            })
+        );
+        image.position.z = 0.04;
+        group.add(image);
+
+        group.position.set(0, options.y || 0, options.z || 0);
+        group.rotation.x = options.rotateX || 0;
+        return group;
     }
 
     // ========== 방 꾸미기 ==========
@@ -692,7 +717,10 @@ class ThemePark {
         if (data.gameType === 'yang') {
             new YangGame().render(body);
         } else {
-            body.innerHTML = '<div class="booth-icon">' + data.icon + '</div><div class="booth-desc">' + data.desc + '</div><button class="booth-action-btn">' + data.action + '</button>';
+            const preview = data.previewImage
+                ? '<img src="' + encodeURI(data.previewImage) + '" alt="' + data.name + '" style="display:block;width:100%;max-width:340px;margin:0 auto 18px;border-radius:16px;background:#fff;box-shadow:0 10px 30px rgba(0,0,0,0.22);">'
+                : '';
+            body.innerHTML = preview + '<div class="booth-icon">' + data.icon + '</div><div class="booth-desc">' + data.desc + '</div><button class="booth-action-btn">' + data.action + '</button>';
             body.querySelector('.booth-action-btn')?.addEventListener('click', () => {
                 alert('[프로토타입] "' + data.name + '" 기능은 추후 AI API 연동으로 구현됩니다.');
             });

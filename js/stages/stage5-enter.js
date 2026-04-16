@@ -7,77 +7,85 @@ class Stage5Enter {
 
     async start(memo) {
         const camera = this.scene.camera;
-        const dp = this.app._doorPos || { x: 0, y: 0.525, z: -4.25 };
-        const doorCenter = new THREE.Vector3(dp.x, dp.y, dp.z);
+        const portal = this.app._portalTarget || this.app._doorPos || { x: 0, y: 0.525, z: -4.25 };
+        const doorCenter = new THREE.Vector3(portal.x, portal.y, portal.z);
+        const vortexTransition = document.getElementById('vortex-transition');
+        const vortexInner = vortexTransition.querySelector('.vortex-transition-inner');
 
-        // 블랙아웃 오버레이 준비
+        // 전환 오버레이 준비
         const whiteout = document.getElementById('whiteout');
         whiteout.style.background = '#ffffff';
         whiteout.classList.remove('hidden');
         whiteout.style.opacity = '0';
+        vortexTransition.classList.remove('hidden');
+        vortexTransition.style.opacity = '0';
+        vortexInner.style.left = '50%';
+        vortexInner.style.top = '50%';
+        vortexInner.style.transform = 'translate(-50%, -50%) scale(0.12)';
+        vortexInner.style.rotate = '0deg';
 
         // 슈우웅 소리
         this._playVortexSound();
 
-        // 카메라가 소용돌이 속으로 빨려들어감
+        // 먼저 문 안쪽으로 빨려 들어가는 느낌을 만든 뒤,
+        // 그 위치에서 소용돌이가 화면 전체를 덮게 한다.
         await new Promise(resolve => {
             const tl = gsap.timeline({ onComplete: resolve });
-
-            // 1단계: 카메라가 소용돌이 중심으로 빨려감 + 회전
             tl.to(camera.position, {
-                duration: 2.0,
-                x: doorCenter.x,
-                y: doorCenter.y,
-                z: doorCenter.z - 8,
-                ease: 'power3.in',
+                duration: 0.44,
+                x: doorCenter.x * 0.55,
+                y: doorCenter.y * 0.72,
+                z: camera.position.z - 1.15,
+                ease: 'power2.in',
                 onUpdate: () => {
-                    // 소용돌이 중심을 바라봄
-                    camera.lookAt(doorCenter.x, doorCenter.y, doorCenter.z - 30);
+                    camera.lookAt(doorCenter.x, doorCenter.y, doorCenter.z);
                 }
-            })
-            // FOV 넓어짐 (빨려드는 효과)
+            }, 0)
             .to(camera, {
-                duration: 2.0,
-                fov: 120,
+                duration: 0.44,
+                fov: 56,
                 ease: 'power2.in',
                 onUpdate: () => camera.updateProjectionMatrix()
-            }, '<')
-            // 카메라 살짝 회전 (소용돌이 느낌)
-            .to(camera.rotation, {
-                duration: 2.0,
-                z: -0.5,
-                ease: 'power2.in'
-            }, '<')
-            // 화이트아웃 (하늘색 소용돌이니까 밝게)
-            .to(whiteout, {
-                duration: 1.0,
+            }, 0)
+            .add(() => {
+                const projected = doorCenter.clone().project(camera);
+                const startX = ((projected.x + 1) * 0.5) * window.innerWidth;
+                const startY = ((1 - projected.y) * 0.5) * window.innerHeight;
+                vortexInner.style.left = `${startX}px`;
+                vortexInner.style.top = `${startY}px`;
+                vortexInner.style.transform = 'translate(-50%, -50%) scale(0.26)';
+            })
+            .to(vortexTransition, {
+                duration: 0.12,
                 opacity: 1,
-                ease: 'power2.in'
-            }, '-=1.0');
+                ease: 'power1.out'
+            })
+            .to(vortexInner, {
+                duration: 0.72,
+                left: window.innerWidth * 0.5,
+                top: window.innerHeight * 0.5,
+                scale: 8.5,
+                rotate: 260,
+                ease: 'power4.in'
+            }, '<')
+            .to(whiteout, {
+                duration: 0.18,
+                opacity: 1,
+                ease: 'power2.inOut'
+            }, '-=0.08');
         });
 
         // 테마파크로 전환
-        await Utils.delay(300);
+        await Utils.delay(120);
 
         // 소용돌이 애니메이션 정리
         if (this.app._stage4) {
             this.app._stage4.stopEffects();
         }
-
-        // 밝아지면서 테마파크
-        whiteout.style.background = '#ffffff';
-        await new Promise(resolve => {
-            gsap.to(whiteout, {
-                duration: 1.2,
-                opacity: 0,
-                ease: 'power2.inOut',
-                onComplete: () => {
-                    Utils.hide('whiteout');
-                    whiteout.style.background = '';
-                    resolve();
-                }
-            });
-        });
+        Utils.hide('vortex-transition');
+        vortexInner.style.left = '50%';
+        vortexInner.style.top = '50%';
+        vortexInner.style.transform = 'translate(-50%, -50%) scale(0.2)';
     }
 
     _playVortexSound() {

@@ -115,7 +115,7 @@ class NemonicTourApp {
 
         // 캐릭터 생성
         this.character = new CharacterController(this.nemonicScene.scene);
-        this.character.group.position.set(0, 0, 12);
+        this.character.group.position.set(0, 5.5, 12);
         this.nemonicScene.scene.add(this.character.group);
         this.character.activate(this.activeCamera);
         this.character.enableClickMove(this.nemonicScene.renderer.domElement);
@@ -140,6 +140,8 @@ class NemonicTourApp {
             if (e.code === 'KeyE' && this.themePark) this.themePark.interact();
             if (e.code === 'Escape' && this.themePark) this.themePark.closeBooth();
         });
+
+        this._playThemeParkArrival();
     }
 
     _clearIntroScene() {
@@ -154,6 +156,55 @@ class NemonicTourApp {
 
     addParticleSystem(ps) {
         this.particleSystems.push(ps);
+    }
+
+    _playThemeParkArrival() {
+        const whiteout = document.getElementById('whiteout');
+        whiteout.classList.remove('hidden');
+        whiteout.style.background = '#ffffff';
+        whiteout.style.opacity = '1';
+
+        if (this.character) {
+            this.character.isActive = false;
+        }
+
+        if (this.activeCamera) {
+            this.activeCamera.position.set(0, 21, 17);
+            this.activeCamera.lookAt(0, 4.5, 12);
+        }
+
+        gsap.timeline({
+            onComplete: () => {
+                if (this.character) {
+                    this.character.isActive = true;
+                }
+                Utils.hide('whiteout');
+                whiteout.style.background = '';
+            }
+        })
+            .to(whiteout, {
+                duration: 0.65,
+                opacity: 0,
+                ease: 'power2.out'
+            }, 0.05)
+            .to(this.character.group.position, {
+                duration: 0.9,
+                y: 0,
+                ease: 'bounce.out'
+            }, 0.05)
+            .to(this.activeCamera.position, {
+                duration: 1.0,
+                y: 15,
+                z: 12,
+                ease: 'power2.out',
+                onUpdate: () => {
+                    this.activeCamera.lookAt(
+                        this.character.group.position.x,
+                        this.character.group.position.y + 1.2,
+                        this.character.group.position.z
+                    );
+                }
+            }, 0.05);
     }
 
     _animate() {

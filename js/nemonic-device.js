@@ -11,15 +11,15 @@ class NemonicDevice {
     }
 
     _build() {
-        const bodyW = 1.3, bodyD = 1.3, bodyH = 1.05;
+        const bodyW = 1.26, bodyD = 1.26, bodyH = 1.08;
         const bodyMat = new THREE.MeshStandardMaterial({
-            color: 0xe8e4d8, roughness: 0.5, metalness: 0.03
+            color: 0xd8d2c4, roughness: 0.66, metalness: 0.02
         });
         const trimMat = new THREE.MeshStandardMaterial({
-            color: 0xece8dc, roughness: 0.4, metalness: 0.02
+            color: 0xe0dad0, roughness: 0.68, metalness: 0.01
         });
         const baseMat = new THREE.MeshStandardMaterial({
-            color: 0xddd7c9, roughness: 0.62, metalness: 0.01
+            color: 0xcec6b8, roughness: 0.78, metalness: 0.0
         });
 
         // === 메인 바디 ===
@@ -42,12 +42,48 @@ class NemonicDevice {
         lid.position.y = bodyH;
         this.group.add(lid);
 
-        // === 상단 용지 출력 슬릿 (중앙 가로 줄) ===
+        // 실제 제품처럼 대각선 윗면 골
+        const ribMat = new THREE.MeshStandardMaterial({
+            color: 0xd4cdc0,
+            roughness: 0.82,
+            metalness: 0.0
+        });
+        const ribCount = 13;
+        for (let i = 0; i < ribCount; i++) {
+            const x = -bodyW * 0.34 + i * 0.06;
+            const z = -0.03;
+            if (x > 0.02 && x < bodyW * 0.3) continue;
+            const rib = new THREE.Mesh(
+                new THREE.BoxGeometry(0.028, 0.012, bodyD * 1.05),
+                ribMat
+            );
+            rib.rotation.y = Math.PI / 4;
+            rib.position.set(x, bodyH + 0.022, z);
+            this.group.add(rib);
+        }
+
+        // 슬롯 아래 상판 그림자톤으로 윗면 날아감을 줄임
+        const topPanelGeo = new THREE.PlaneGeometry(bodyW * 0.92, bodyD * 0.84);
+        const topPanelMat = new THREE.MeshStandardMaterial({
+            color: 0xd2cbbe,
+            roughness: 0.74,
+            metalness: 0.0,
+            transparent: true,
+            opacity: 0.28,
+            side: THREE.DoubleSide
+        });
+        const topPanel = new THREE.Mesh(topPanelGeo, topPanelMat);
+        topPanel.rotation.x = -Math.PI / 2;
+        topPanel.position.set(0, bodyH + 0.016, 0.02);
+        this.group.add(topPanel);
+
+        // === 상단 용지 출력 슬릿 (앞쪽에 위치) ===
         const topY = bodyH + 0.015;
-        const slitGeo = new THREE.BoxGeometry(bodyW * 0.55, 0.003, 0.015);
-        const slitMat = new THREE.MeshStandardMaterial({ color: 0x56626d, roughness: 0.35, metalness: 0.2 });
+        const slitGeo = new THREE.BoxGeometry(bodyW * 0.34, 0.003, 0.018);
+        const slitMat = new THREE.MeshStandardMaterial({ color: 0x7a7c7f, roughness: 0.48, metalness: 0.22 });
         this.paperSlot = new THREE.Mesh(slitGeo, slitMat);
-        this.paperSlot.position.set(0, topY, 0);
+        this.paperSlot.rotation.y = -0.38;
+        this.paperSlot.position.set(bodyW * 0.08, topY, bodyD * 0.14);
         this.group.add(this.paperSlot);
 
         // LED 표시등 2개 (전면 오른쪽 하단)
@@ -63,6 +99,20 @@ class NemonicDevice {
         this.ledLight = new THREE.PointLight(0x00ff88, 0.1, 1);
         this.ledLight.position.set(bodyW / 2 - 0.15, bodyH * 0.12, bodyD / 2 + 0.1);
         this.group.add(this.ledLight);
+
+        // 측면 로고 느낌 (작은 C 홈)
+        const logoMat = new THREE.MeshStandardMaterial({
+            color: 0xbcb4a6,
+            roughness: 0.9,
+            metalness: 0.0
+        });
+        const logoOuter = new THREE.Mesh(
+            new THREE.TorusGeometry(0.08, 0.012, 10, 24, Math.PI * 1.45),
+            logoMat
+        );
+        logoOuter.rotation.set(Math.PI / 2, 0, Math.PI * 0.22);
+        logoOuter.position.set(-bodyW / 2 - 0.002, bodyH * 0.55, 0.04);
+        this.group.add(logoOuter);
 
         // === 벽면 (메모 점착 타겟 - 보이지 않음) ===
         this.wallSurface = new THREE.Object3D();
@@ -116,7 +166,7 @@ class NemonicDevice {
         this.printedMemo.castShadow = true;
 
         // 처음엔 기기 내부에 숨겨진 상태 (종이가 아래에 있음)
-        this.printedMemo.position.set(0, topY - 0.4, -0.15);
+        this.printedMemo.position.set(bodyW * 0.08, topY - 0.4, bodyD * 0.14);
         this.printedMemo.rotation.x = -0.55; // 실제 네모닉처럼 뒤로 기울어짐 (~30도)
         this.printedMemo.name = 'printed-memo';
 

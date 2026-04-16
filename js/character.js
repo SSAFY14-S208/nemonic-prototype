@@ -35,6 +35,13 @@ class CharacterController {
         this.joystickInput = { x: 0, y: 0 };
         // 키보드도 보조로 지원
         this.keys = {};
+        this.baseY = 0;
+        this.modelRoot = null;
+        this.shadow = null;
+        this.mixer = null;
+        this.animActions = {};
+        this.currentAction = null;
+        this.walkCycle = 0;
 
         this._buildCharacter();
         this._bindInput();
@@ -118,96 +125,119 @@ class CharacterController {
     }
 
     _buildCharacter() {
-        const bodyMat = new THREE.MeshStandardMaterial({
-            color: 0x6366f1, roughness: 0.3, metalness: 0.4
-        });
-
-        // 몸통
-        const torso = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.32, 0.28, 0.65, 16), bodyMat
-        );
-        torso.position.y = 0.75;
-        torso.castShadow = true;
-        this.group.add(torso);
-
-        // 상단 반구
-        const topHalf = new THREE.Mesh(
-            new THREE.SphereGeometry(0.32, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), bodyMat
-        );
-        topHalf.position.y = 1.08;
-        this.group.add(topHalf);
-
-        // 하단 반구
-        const botHalf = new THREE.Mesh(
-            new THREE.SphereGeometry(0.28, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), bodyMat
-        );
-        botHalf.position.y = 0.42;
-        this.group.add(botHalf);
-
-        // 머리
-        const headMat = new THREE.MeshStandardMaterial({
-            color: 0xf5f5f5, roughness: 0.2, metalness: 0.3
-        });
-        const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 16), headMat);
-        head.position.y = 1.55;
-        head.castShadow = true;
-        this.group.add(head);
-
-        // 눈
-        const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
-        this.leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), eyeMat);
-        this.leftEye.position.set(-0.1, 1.6, 0.24);
-        this.group.add(this.leftEye);
-        this.rightEye = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), eyeMat);
-        this.rightEye.position.set(0.1, 1.6, 0.24);
-        this.group.add(this.rightEye);
-
-        // 입
-        const smile = new THREE.Mesh(
-            new THREE.BoxGeometry(0.1, 0.02, 0.02),
-            new THREE.MeshBasicMaterial({ color: 0xe74c3c })
-        );
-        smile.position.set(0, 1.48, 0.28);
-        this.group.add(smile);
-
-        // 안테나
-        const antMat = new THREE.MeshStandardMaterial({ color: 0xffd54f });
-        const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.25, 8), antMat);
-        antenna.position.set(0, 1.95, 0);
-        this.group.add(antenna);
-        this.antennaTip = new THREE.Mesh(
-            new THREE.SphereGeometry(0.06, 8, 8),
-            new THREE.MeshBasicMaterial({ color: 0xffd54f })
-        );
-        this.antennaTip.position.set(0, 2.1, 0);
-        this.group.add(this.antennaTip);
-
-        // 팔
-        const armMat = new THREE.MeshStandardMaterial({ color: 0x5558e8 });
-        this.leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.32, 0.1), armMat);
-        this.leftArm.position.set(-0.42, 0.72, 0);
-        this.group.add(this.leftArm);
-        this.rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.32, 0.1), armMat);
-        this.rightArm.position.set(0.42, 0.72, 0);
-        this.group.add(this.rightArm);
-
-        // 다리
-        const legMat = new THREE.MeshStandardMaterial({ color: 0x333366 });
-        this.leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.3, 0.12), legMat);
-        this.leftLeg.position.set(-0.13, 0.15, 0);
-        this.group.add(this.leftLeg);
-        this.rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.3, 0.12), legMat);
-        this.rightLeg.position.set(0.13, 0.15, 0);
-        this.group.add(this.rightLeg);
-
-        // 바닥 그림자
         const shadowMat = new THREE.MeshBasicMaterial({
             color: 0x000000, transparent: true, opacity: 0.15
         });
-        const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.45, 16), shadowMat);
-        shadow.rotation.x = -Math.PI / 2;
-        shadow.position.y = 0.02;
-        this.group.add(shadow);
+        this.shadow = new THREE.Mesh(new THREE.CircleGeometry(0.52, 20), shadowMat);
+        this.shadow.rotation.x = -Math.PI / 2;
+        this.shadow.position.y = 0.02;
+        this.group.add(this.shadow);
+
+        this.modelRoot = new THREE.Group();
+        this.modelRoot.position.y = 0;
+        this.group.add(this.modelRoot);
+
+        const loader = new THREE.GLTFLoader();
+        loader.load(
+            'assets/nong_dam_gom.glb',
+            (gltf) => {
+                const bear = gltf.scene;
+                bear.scale.setScalar(0.88);
+                bear.position.set(0, 0, 0);
+                bear.traverse((obj) => {
+                    if (obj.isMesh) {
+                        obj.castShadow = true;
+                        obj.receiveShadow = true;
+                    }
+                });
+                this.modelRoot.add(bear);
+                this._setupAnimations(gltf.animations);
+            },
+            undefined,
+            () => {
+                this._buildFallbackCharacter();
+            }
+        );
+    }
+
+    _buildFallbackCharacter() {
+        const bodyMat = new THREE.MeshStandardMaterial({
+            color: 0xf4f0e4, roughness: 0.55, metalness: 0.02
+        });
+        const bellyMat = new THREE.MeshStandardMaterial({
+            color: 0xfffaf1, roughness: 0.5, metalness: 0.01
+        });
+        const earMat = new THREE.MeshStandardMaterial({
+            color: 0xd9b98b, roughness: 0.6, metalness: 0.0
+        });
+
+        const body = new THREE.Mesh(new THREE.SphereGeometry(0.34, 18, 16), bodyMat);
+        body.position.y = 0.72;
+        this.modelRoot.add(body);
+
+        const belly = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 12), bellyMat);
+        belly.position.set(0, 0.67, 0.19);
+        belly.scale.set(1, 1.1, 0.7);
+        this.modelRoot.add(belly);
+
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 18, 16), bodyMat);
+        head.position.set(0, 1.12, 0.02);
+        this.modelRoot.add(head);
+
+        [-0.17, 0.17].forEach((x) => {
+            const ear = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 10), earMat);
+            ear.position.set(x, 1.33, -0.03);
+            this.modelRoot.add(ear);
+        });
+
+        [-0.09, 0.09].forEach((x) => {
+            const eye = new THREE.Mesh(
+                new THREE.SphereGeometry(0.022, 10, 10),
+                new THREE.MeshBasicMaterial({ color: 0x111111 })
+            );
+            eye.position.set(x, 1.12, 0.24);
+            this.modelRoot.add(eye);
+        });
+
+        const nose = new THREE.Mesh(
+            new THREE.SphereGeometry(0.03, 10, 10),
+            new THREE.MeshBasicMaterial({ color: 0x5c4632 })
+        );
+        nose.position.set(0, 1.02, 0.27);
+        this.modelRoot.add(nose);
+
+        this.modelRoot.scale.setScalar(1.28);
+    }
+
+    _setupAnimations(animations) {
+        if (!animations || !animations.length) return;
+        this.mixer = new THREE.AnimationMixer(this.modelRoot);
+        animations.forEach((clip) => {
+            const key = clip.name.toLowerCase();
+            this.animActions[key] = this.mixer.clipAction(clip);
+        });
+        this._playAnimationByHint('idle');
+    }
+
+    _findAnimationKey(hint) {
+        const keys = Object.keys(this.animActions);
+        return keys.find((key) => key.includes(hint)) || keys[0] || null;
+    }
+
+    _playAnimationByHint(hint) {
+        const key = this._findAnimationKey(hint);
+        if (!key) return;
+        if (this.currentAction === key) return;
+
+        const next = this.animActions[key];
+        if (!next) return;
+        if (this.currentAction && this.animActions[this.currentAction]) {
+            this.animActions[this.currentAction].fadeOut(0.18);
+        }
+        next.reset();
+        next.fadeIn(0.18);
+        next.play();
+        this.currentAction = key;
     }
 
     _bindInput() {
@@ -333,6 +363,7 @@ class CharacterController {
 
     update(dt, time) {
         if (!this.isActive || !this.camera) return;
+        this.baseY = this.group.position.y;
 
         let isWalking = false;
 
@@ -423,19 +454,18 @@ class CharacterController {
 
         // --- 걸음 애니메이션 ---
         if (isWalking) {
-            const walkFreq = 10;
-            const walkAmp = 0.25;
-            this.leftLeg.rotation.x = Math.sin(time * walkFreq) * walkAmp;
-            this.rightLeg.rotation.x = -Math.sin(time * walkFreq) * walkAmp;
-            this.leftArm.rotation.x = -Math.sin(time * walkFreq) * walkAmp * 0.6;
-            this.rightArm.rotation.x = Math.sin(time * walkFreq) * walkAmp * 0.6;
-            this.group.position.y = Math.abs(Math.sin(time * walkFreq)) * 0.04;
+            this.walkCycle += dt * 8;
+            this.group.position.y = this.baseY * 0.85 + Math.abs(Math.sin(this.walkCycle)) * 0.025;
+            if (this.modelRoot) {
+                this.modelRoot.rotation.z = Math.sin(this.walkCycle) * 0.04;
+            }
+            this._playAnimationByHint('walk');
         } else {
-            this.leftLeg.rotation.x *= 0.85;
-            this.rightLeg.rotation.x *= 0.85;
-            this.leftArm.rotation.x *= 0.85;
-            this.rightArm.rotation.x *= 0.85;
-            this.group.position.y *= 0.9;
+            this.group.position.y *= 0.85;
+            if (this.modelRoot) {
+                this.modelRoot.rotation.z *= 0.82;
+            }
+            this._playAnimationByHint('idle');
         }
 
         // 발자국
@@ -453,9 +483,8 @@ class CharacterController {
         }
         this._updateFootprints(dt);
 
-        // 안테나 흔들림
-        if (this.antennaTip) {
-            this.antennaTip.position.x = Math.sin(time * 3) * 0.04;
+        if (this.mixer) {
+            this.mixer.update(dt);
         }
 
         // 클릭 마커 펄스 애니메이션
