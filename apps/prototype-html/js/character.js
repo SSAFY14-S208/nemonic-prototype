@@ -6,15 +6,24 @@ class CharacterController {
         this.moveSpeed = 5;
         this.isActive = false;
         this.camera = null;
+        this.moveAcceleration = 12;
+        this.moveDeceleration = 10;
+        this.turnResponsiveness = 10;
+        this.minMoveSpeed = 0.05;
 
         // 클릭 이동
         this.targetPos = null;       // 이동 목표 위치
         this.isMoving = false;
         this.velocity = new THREE.Vector3();
 
-        // 직교 카메라용 오프셋
-        this.cameraHeight = 15;
-        this.cameraDistance = 12;
+        // 3인칭 추적 카메라 오프셋
+        this.cameraHeight = 2.8;
+        this.cameraDistance = 5.8;
+        this.cameraSideOffset = 0;
+        this.cameraLookHeight = 1.25;
+        this.cameraLookAhead = 2.8;
+        this.cameraLerp = 0.12;
+        this.turnLerp = 0.24;
 
         // 바닥 레이캐스팅용
         this.raycaster = new THREE.Raycaster();
@@ -154,7 +163,8 @@ class CharacterController {
                 this._setupAnimations(gltf.animations);
             },
             undefined,
-            () => {
+            (err) => {
+                console.error('GLB load error:', err);
                 this._buildFallbackCharacter();
             }
         );
@@ -242,8 +252,22 @@ class CharacterController {
 
     _bindInput() {
         // 키보드 (보조)
-        window.addEventListener('keydown', e => { this.keys[e.code] = true; });
-        window.addEventListener('keyup', e => { this.keys[e.code] = false; });
+        window.addEventListener('keydown', (e) => {
+            if (this._isMovementKey(e.code)) {
+                e.preventDefault();
+            }
+            this.keys[e.code] = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            if (this._isMovementKey(e.code)) {
+                e.preventDefault();
+            }
+            this.keys[e.code] = false;
+        });
+        window.addEventListener('blur', () => this._clearMovementInput());
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) this._clearMovementInput();
+        });
 
         // 조이스틱
         this._setupJoystick();
@@ -251,6 +275,7 @@ class CharacterController {
 
     // 클릭 이동 활성화 (renderer 요소에 바인딩)
     enableClickMove(rendererDom) {
+        rendererDom.style.touchAction = 'none';
         const onClick = (e) => {
             if (!this.isActive) return;
             // UI 위 클릭은 무시
@@ -356,16 +381,17 @@ class CharacterController {
     deactivate() { this.isActive = false; }
 
     _snapCamera() {
-        const p = this.group.position;
-        this.camera.position.set(p.x, p.y + this.cameraHeight, p.z + this.cameraDistance);
-        this.camera.lookAt(p.x, 0, p.z);
+        const { position, lookAt } = this._getCameraTargets();
+        this.camera.position.copy(position);
+        this.camera.lookAt(lookAt);
     }
 
     update(dt, time) {
         if (!this.isActive || !this.camera) return;
         this.baseY = this.group.position.y;
 
-        let isWalking = false;
+        let desiredMoveDir = null;
+        let desiredSpeed = 0;
 
         // --- 1. 클릭 이동 ---
         if (this.isMoving && this.targetPos) {
@@ -373,55 +399,72 @@ class CharacterController {
             dir.y = 0;
             const dist = dir.length();
 
-            if (dist > 0.2) {
+            if (dist > 0.08) {
                 dir.normalize();
-                const step = Math.min(this.moveSpeed * dt, dist);
-                this.group.position.addScaledVector(dir, step);
-                isWalking = true;
-
-                // 회전
-                const targetAngle = Math.atan2(dir.x, dir.z);
-                let diff = targetAngle - this.group.rotation.y;
-                while (diff > Math.PI) diff -= Math.PI * 2;
-                while (diff < -Math.PI) diff += Math.PI * 2;
-                this.group.rotation.y += diff * 0.2;
+                desiredMoveDir = dir;
+                desiredSpeed = this.moveSpeed * Math.min(1, Math.max(0.12, dist / 1.4));
+                if (dist < 0.45) {
+                    desiredSpeed *= dist / 0.45;
+                }
             } else {
                 // 도착
                 this.isMoving = false;
                 this.targetPos = null;
                 this.clickMarker.visible = false;
+                this.velocity.multiplyScalar(0.3);
             }
         }
 
         // --- 2. 키보드/조이스틱 이동 (보조) ---
-        let inputX = 0, inputZ = 0;
-        if (this.keys['KeyA'] || this.keys['ArrowLeft']) inputX = -1;
-        if (this.keys['KeyD'] || this.keys['ArrowRight']) inputX = 1;
-        if (this.keys['KeyW'] || this.keys['ArrowUp']) inputZ = -1;
-        if (this.keys['KeyS'] || this.keys['ArrowDown']) inputZ = 1;
+        let inputX = 0;
+        let inputForward = 0;
+        if (this.keys['KeyA'] || this.keys['ArrowLeft']) inputX -= 1;
+        if (this.keys['KeyD'] || this.keys['ArrowRight']) inputX += 1;
+        if (this.keys['KeyW'] || this.keys['ArrowUp']) inputForward += 1;
+        if (this.keys['KeyS'] || this.keys['ArrowDown']) inputForward -= 1;
         if (Math.abs(this.joystickInput.x) > 0.15) inputX = this.joystickInput.x;
-        if (Math.abs(this.joystickInput.y) > 0.15) inputZ = this.joystickInput.y;
+        if (Math.abs(this.joystickInput.y) > 0.15) inputForward = -this.joystickInput.y;
 
-        if (inputX !== 0 || inputZ !== 0) {
+        if (inputX !== 0 || inputForward !== 0) {
             // 키보드 입력 시 클릭 이동 취소
             this.isMoving = false;
             this.targetPos = null;
             this.clickMarker.visible = false;
 
-            const moveDir = new THREE.Vector3(inputX, 0, inputZ).normalize();
-            this.group.position.addScaledVector(moveDir, this.moveSpeed * dt);
-            isWalking = true;
+            desiredMoveDir = this._getMoveDirectionFromInput(inputX, inputForward);
+            desiredSpeed = this.moveSpeed;
+        }
 
-            const targetAngle = Math.atan2(moveDir.x, moveDir.z);
+        const desiredVelocity = desiredMoveDir
+            ? desiredMoveDir.clone().multiplyScalar(desiredSpeed)
+            : new THREE.Vector3();
+        const velocityLerp = 1 - Math.exp(-(desiredMoveDir ? this.moveAcceleration : this.moveDeceleration) * dt);
+        this.velocity.lerp(desiredVelocity, velocityLerp);
+        if (!desiredMoveDir && this.velocity.lengthSq() < this.minMoveSpeed * this.minMoveSpeed) {
+            this.velocity.set(0, 0, 0);
+        }
+
+        this.group.position.addScaledVector(this.velocity, dt);
+
+        const planarSpeed = Math.hypot(this.velocity.x, this.velocity.z);
+        const isWalking = planarSpeed > 0.18;
+
+        if (isWalking) {
+            const targetAngle = Math.atan2(this.velocity.x, this.velocity.z);
             let diff = targetAngle - this.group.rotation.y;
             while (diff > Math.PI) diff -= Math.PI * 2;
             while (diff < -Math.PI) diff += Math.PI * 2;
-            this.group.rotation.y += diff * 0.2;
+            const rotationLerp = 1 - Math.exp(-this.turnResponsiveness * dt);
+            this.group.rotation.y += diff * rotationLerp;
         }
 
         // 경계
-        this.group.position.x = Math.max(-18, Math.min(18, this.group.position.x));
-        this.group.position.z = Math.max(-18, Math.min(18, this.group.position.z));
+        const clampedX = Math.max(-18, Math.min(18, this.group.position.x));
+        const clampedZ = Math.max(-18, Math.min(18, this.group.position.z));
+        if (clampedX !== this.group.position.x) this.velocity.x = 0;
+        if (clampedZ !== this.group.position.z) this.velocity.z = 0;
+        this.group.position.x = clampedX;
+        this.group.position.z = clampedZ;
 
         // 부스 충돌 체크 (벽 통과 방지)
         if (this.collisionBoxes) {
@@ -441,6 +484,7 @@ class CharacterController {
                     else if (min === dRight) this.group.position.x = box.maxX + r;
                     else if (min === dBack) this.group.position.z = box.minZ - r;
                     else this.group.position.z = box.maxZ + r;
+                    this.velocity.set(0, 0, 0);
 
                     // 클릭 이동 중이면 취소
                     if (this.isMoving) {
@@ -499,18 +543,81 @@ class CharacterController {
     }
 
     _updateCamera(dt) {
-        const p = this.group.position;
-        const targetX = p.x;
-        const targetY = p.y + this.cameraHeight;
-        const targetZ = p.z + this.cameraDistance;
+        const { position, lookAt } = this._getCameraTargets();
 
-        this.camera.position.x += (targetX - this.camera.position.x) * 0.08;
-        this.camera.position.y += (targetY - this.camera.position.y) * 0.08;
-        this.camera.position.z += (targetZ - this.camera.position.z) * 0.08;
-        this.camera.lookAt(p.x, 0.5, p.z - 1);
+        this.camera.position.x += (position.x - this.camera.position.x) * this.cameraLerp;
+        this.camera.position.y += (position.y - this.camera.position.y) * this.cameraLerp;
+        this.camera.position.z += (position.z - this.camera.position.z) * this.cameraLerp;
+        this.camera.lookAt(lookAt);
     }
 
     getPosition() {
         return this.group.position;
+    }
+
+    _getCameraTargets() {
+        const p = this.group.position;
+        const anchor = new THREE.Vector3(p.x, 0, p.z);
+        const forward = new THREE.Vector3(
+            Math.sin(this.group.rotation.y),
+            0,
+            Math.cos(this.group.rotation.y)
+        ).normalize();
+        const side = new THREE.Vector3(forward.z, 0, -forward.x);
+
+        const position = anchor.clone()
+            .addScaledVector(forward, -this.cameraDistance)
+            .addScaledVector(side, this.cameraSideOffset);
+        position.y = this.cameraHeight;
+
+        const lookAt = anchor.clone()
+            .addScaledVector(forward, this.cameraLookAhead)
+            .addScaledVector(side, this.cameraSideOffset * 0.2);
+        lookAt.y = this.cameraLookHeight;
+
+        return { position, lookAt };
+    }
+
+    _isMovementKey(code) {
+        return code === 'KeyW' ||
+            code === 'KeyA' ||
+            code === 'KeyS' ||
+            code === 'KeyD' ||
+            code === 'ArrowUp' ||
+            code === 'ArrowDown' ||
+            code === 'ArrowLeft' ||
+            code === 'ArrowRight' ||
+            code === 'Space';
+    }
+
+    _clearMovementInput() {
+        this.keys = {};
+        this.joystickInput.x = 0;
+        this.joystickInput.y = 0;
+        const stick = document.querySelector('.joystick-stick');
+        if (stick) stick.style.transform = '';
+    }
+
+    _getMoveDirectionFromInput(inputX, inputForward) {
+        const cameraForward = new THREE.Vector3();
+        this.camera.getWorldDirection(cameraForward);
+        cameraForward.y = 0;
+
+        if (cameraForward.lengthSq() < 1e-6) {
+            cameraForward.set(0, 0, -1);
+        } else {
+            cameraForward.normalize();
+        }
+
+        const cameraRight = new THREE.Vector3(cameraForward.z, 0, -cameraForward.x).normalize();
+        const moveDir = new THREE.Vector3()
+            .addScaledVector(cameraRight, inputX)
+            .addScaledVector(cameraForward, inputForward);
+
+        if (moveDir.lengthSq() < 1e-6) {
+            return cameraForward.clone();
+        }
+
+        return moveDir.normalize();
     }
 }

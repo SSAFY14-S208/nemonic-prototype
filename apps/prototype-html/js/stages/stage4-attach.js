@@ -14,7 +14,6 @@ class Stage4Attach {
     async start(memo) {
         this._doorPos = this.app._doorPos;
         this._portalReveal = 0;
-        if (memo) memo.visible = false;
         await Utils.delay(120);
         const parts = await this._buildDoorFromMemo(memo);
         this._parts = parts;
@@ -195,25 +194,15 @@ class Stage4Attach {
                 const outlineData = octx.createImageData(W, H);
                 for (let y = 0; y < H; y++) {
                     for (let x = 0; x < W; x++) {
-                        let hit = false;
-                        for (let dy = -2; dy <= 2 && !hit; dy++) {
-                            for (let dx = -2; dx <= 2 && !hit; dx++) {
-                                if (isLine(x + dx, y + dy)) hit = true;
-                            }
-                        }
-                        if (!hit) continue;
+                        if (!isLine(x, y)) continue;
                         const i = (y * W + x) * 4;
-                        outlineData.data[i] = 16;
-                        outlineData.data[i + 1] = 16;
-                        outlineData.data[i + 2] = 16;
-                        outlineData.data[i + 3] = 255;
+                        outlineData.data[i] = src[i];
+                        outlineData.data[i + 1] = src[i + 1];
+                        outlineData.data[i + 2] = src[i + 2];
+                        outlineData.data[i + 3] = src[i + 3];
                     }
                 }
                 octx.putImageData(outlineData, 0, 0);
-
-                if (memo.parent) memo.parent.remove(memo);
-                else this.scene.scene.remove(memo);
-                memo.material.dispose();
 
                 const outlineTex = new THREE.Texture(outlineCanvas);
                 outlineTex.minFilter = THREE.LinearFilter;
@@ -226,41 +215,43 @@ class Stage4Attach {
                         map: outlineTex,
                         transparent: true,
                         side: THREE.DoubleSide,
-                        opacity: 1
+                        opacity: 0
                     })
                 );
                 frameMesh.renderOrder = 18;
                 frameMesh.position.set(dp.x, dp.y, dp.z + 0.012);
                 this.scene.scene.add(frameMesh);
 
-                const doorCanvas = document.createElement('canvas');
-                doorCanvas.width = W;
-                doorCanvas.height = H;
-                const dctx = doorCanvas.getContext('2d');
-                dctx.fillStyle = '#ffffff';
-                dctx.fillRect(0, 0, W, H);
-                dctx.globalCompositeOperation = 'destination-in';
-                dctx.drawImage(fullMaskCanvas, 0, 0);
-                dctx.globalCompositeOperation = 'source-over';
-                dctx.drawImage(outlineCanvas, 0, 0);
-
-                const doorTex = new THREE.Texture(doorCanvas);
-                doorTex.minFilter = THREE.LinearFilter;
-                doorTex.magFilter = THREE.LinearFilter;
-                doorTex.needsUpdate = true;
+                const doorMaskTex = new THREE.Texture(fullMaskCanvas);
+                doorMaskTex.minFilter = THREE.LinearFilter;
+                doorMaskTex.magFilter = THREE.LinearFilter;
+                doorMaskTex.needsUpdate = true;
 
                 const doorMesh = new THREE.Mesh(
                     new THREE.PlaneGeometry(memoW, memoH),
-                    new THREE.MeshBasicMaterial({
-                        map: doorTex,
+                    new THREE.MeshStandardMaterial({
                         color: 0xd8d2c4,
                         transparent: true,
-                        alphaTest: 0.04,
+                        alphaMap: doorMaskTex,
+                        alphaTest: 0.5,
                         depthWrite: true,
                         side: THREE.DoubleSide,
+                        roughness: 0.66,
+                        metalness: 0.02
                     })
                 );
                 doorMesh.renderOrder = 16;
+
+                const doorOutlineMesh = new THREE.Mesh(
+                    new THREE.PlaneGeometry(memoW, memoH),
+                    new THREE.MeshBasicMaterial({
+                        map: outlineTex,
+                        transparent: true,
+                        alphaTest: 0.04,
+                        side: THREE.DoubleSide
+                    })
+                );
+                doorOutlineMesh.renderOrder = 17;
 
                 const vortexLayers = this._createVortexLayers(bounds, memoW, memoH, dp, fullMaskCanvas);
                 vortexLayers.forEach((mesh) => {
@@ -272,7 +263,7 @@ class Stage4Attach {
                     z: bounds.portalWorldZ
                 };
 
-                resolve({ bounds, memoW, memoH, dp, frameMesh, doorMesh, vortexLayers });
+                resolve({ bounds, memoW, memoH, dp, frameMesh, doorMesh, doorOutlineMesh, vortexLayers, sourceMemo: memo });
             };
             img.src = this.app._drawingDataURL;
         });
@@ -406,7 +397,7 @@ class Stage4Attach {
 
     async _openDoor(parts) {
         this._playDoorCreakSound();
-        const { doorMesh, bounds, memoW, memoH, dp } = parts;
+        const { doorMesh, doorOutlineMesh, bounds, memoW, memoH, dp, sourceMemo } = parts;
         const doorRightX = (bounds.right - 0.5) * memoW;
         const doorCenterY = -(bounds.cy - 0.5) * memoH;
         const doorHeight = bounds.h * memoH;
@@ -419,6 +410,19 @@ class Stage4Attach {
         hingePivot.add(doorMesh);
         doorMesh.position.set(-doorRightX, 0, 0);
         doorMesh.rotation.set(0, 0, 0);
+
+        hingePivot.add(doorOutlineMesh);
+        doorOutlineMesh.position.set(-doorRightX, 0, 0.003);
+        doorOutlineMesh.rotation.set(0, 0, 0);
+
+        if (sourceMemo) {
+            sourceMemo.visible = false;
+            if (sourceMemo.parent) sourceMemo.parent.remove(sourceMemo);
+            else this.scene.scene.remove(sourceMemo);
+            if (sourceMemo.material) {
+                sourceMemo.material.dispose();
+            }
+        }
 
         const hingeMat = new THREE.MeshStandardMaterial({
             color: 0x8d8d8d,
@@ -472,6 +476,9 @@ class Stage4Attach {
                 const baseOpacity = mesh.userData.baseOpacity || 0.5;
                 mesh.material.opacity = baseOpacity * this._portalReveal * (0.94 + Math.sin(time * 2.3 + index) * 0.04);
             });
+            if (this._parts?.frameMesh?.material) {
+                this._parts.frameMesh.material.opacity = this._portalReveal;
+            }
         };
         tick();
     }

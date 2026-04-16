@@ -7,25 +7,33 @@ class ThemePark {
         this.nearbyBooth = null;
         this.isBoothOpen = false;
         this.decorObjects = [];
-        this.orthoCamera = this._createOrthoCamera();
+        this.camera = this._setupCamera(camera);
         this.textureLoader = new THREE.TextureLoader();
         this._previewTextureCache = new Map();
         this._build();
         this._bindBoothUI();
     }
 
-    _createOrthoCamera() {
-        const aspect = window.innerWidth / window.innerHeight;
-        const fs = 24;
-        const cam = new THREE.OrthographicCamera(-fs*aspect/2, fs*aspect/2, fs/2, -fs/2, 0.1, 100);
-        cam.position.set(0, 15, 12);
-        cam.lookAt(0, 0, 0);
+    _setupCamera(camera) {
+        const cam = camera || new THREE.PerspectiveCamera(
+            50,
+            window.innerWidth / window.innerHeight,
+            0.1,
+            1000
+        );
+        cam.fov = 50;
+        cam.near = 0.1;
+        cam.far = 1000;
+        cam.position.set(0, 3, 18);
+        cam.lookAt(0, 1.2, 10);
         cam.updateProjectionMatrix();
-        window.addEventListener('resize', () => {
-            const a = window.innerWidth / window.innerHeight;
-            cam.left = -fs*a/2; cam.right = fs*a/2; cam.top = fs/2; cam.bottom = -fs/2;
-            cam.updateProjectionMatrix();
-        });
+
+        if (!camera) {
+            window.addEventListener('resize', () => {
+                cam.aspect = window.innerWidth / window.innerHeight;
+                cam.updateProjectionMatrix();
+            });
+        }
         return cam;
     }
 
@@ -116,13 +124,121 @@ class ThemePark {
     }
 
     _createRoads() {
-        const mat = new THREE.MeshStandardMaterial({ color: 0xd8c8a8, roughness: 0.8 });
-        const r1 = new THREE.Mesh(new THREE.PlaneGeometry(3, 30), mat);
-        r1.rotation.x = -Math.PI / 2; r1.position.y = 0.01;
-        this.group.add(r1);
-        const r2 = new THREE.Mesh(new THREE.PlaneGeometry(30, 3), mat);
-        r2.rotation.x = -Math.PI / 2; r2.position.set(0, 0.01, -2);
-        this.group.add(r2);
+        const c = document.createElement('canvas');
+        c.width = 512;
+        c.height = 512;
+        const ctx = c.getContext('2d');
+
+        ctx.fillStyle = '#b8b2a4';
+        ctx.fillRect(0, 0, 512, 512);
+
+        for (let i = 0; i < 36; i++) {
+            const tone = Math.random() > 0.5 ? 255 : 110;
+            const alpha = 0.025 + Math.random() * 0.035;
+            ctx.fillStyle = tone === 255
+                ? `rgba(210, 205, 196, ${alpha})`
+                : `rgba(115, 108, 98, ${alpha})`;
+            ctx.beginPath();
+            ctx.ellipse(
+                Math.random() * 512,
+                Math.random() * 512,
+                24 + Math.random() * 56,
+                14 + Math.random() * 34,
+                Math.random() * Math.PI,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+        }
+
+        for (let i = 0; i < 2400; i++) {
+            const shade = 138 + Math.floor(Math.random() * 42);
+            ctx.fillStyle = `rgba(${shade + 2}, ${shade + 1}, ${shade - 1}, ${0.05 + Math.random() * 0.05})`;
+            ctx.beginPath();
+            ctx.ellipse(
+                Math.random() * 512,
+                Math.random() * 512,
+                0.6 + Math.random() * 1.8,
+                0.6 + Math.random() * 1.4,
+                Math.random() * Math.PI,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+        }
+
+        for (let i = 0; i < 140; i++) {
+            const shade = 154 + Math.floor(Math.random() * 28);
+            ctx.fillStyle = `rgba(${shade + 2}, ${shade + 1}, ${shade - 2}, ${0.09 + Math.random() * 0.08})`;
+            ctx.beginPath();
+            ctx.ellipse(
+                Math.random() * 512,
+                Math.random() * 512,
+                1.4 + Math.random() * 4.4,
+                1.4 + Math.random() * 3.8,
+                Math.random() * Math.PI,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+        }
+
+        const edgeDark = ctx.createLinearGradient(0, 0, 512, 0);
+        edgeDark.addColorStop(0, 'rgba(90,86,80,0.10)');
+        edgeDark.addColorStop(0.12, 'rgba(90,86,80,0)');
+        edgeDark.addColorStop(0.88, 'rgba(90,86,80,0)');
+        edgeDark.addColorStop(1, 'rgba(90,86,80,0.10)');
+        ctx.fillStyle = edgeDark;
+        ctx.fillRect(0, 0, 512, 512);
+
+        const roadTex = new THREE.CanvasTexture(c);
+        roadTex.wrapS = roadTex.wrapT = THREE.RepeatWrapping;
+        roadTex.anisotropy = 4;
+
+        const makeRoadMaterial = (repeatX, repeatY) => {
+            const map = roadTex.clone();
+            map.wrapS = map.wrapT = THREE.RepeatWrapping;
+            map.repeat.set(repeatX, repeatY);
+            map.anisotropy = 4;
+            return new THREE.MeshStandardMaterial({
+                map,
+                color: 0xddd8ce,
+                roughness: 0.98,
+                metalness: 0.0
+            });
+        };
+
+        const verticalRoad = new THREE.Mesh(
+            new THREE.PlaneGeometry(3, 30),
+            makeRoadMaterial(2.2, 14)
+        );
+        verticalRoad.rotation.x = -Math.PI / 2;
+        verticalRoad.position.set(0, 0.01, 0);
+        this.group.add(verticalRoad);
+
+        const leftRoad = new THREE.Mesh(
+            new THREE.PlaneGeometry(13.5, 3),
+            makeRoadMaterial(8.5, 2.2)
+        );
+        leftRoad.rotation.x = -Math.PI / 2;
+        leftRoad.position.set(-8.25, 0.01, -2);
+        this.group.add(leftRoad);
+
+        const rightRoad = new THREE.Mesh(
+            new THREE.PlaneGeometry(13.5, 3),
+            makeRoadMaterial(8.5, 2.2)
+        );
+        rightRoad.rotation.x = -Math.PI / 2;
+        rightRoad.position.set(8.25, 0.01, -2);
+        this.group.add(rightRoad);
+
+        const centerCap = new THREE.Mesh(
+            new THREE.PlaneGeometry(3.04, 3.04),
+            makeRoadMaterial(2.2, 2.2)
+        );
+        centerCap.rotation.x = -Math.PI / 2;
+        centerCap.position.set(0, 0.012, -2);
+        this.group.add(centerCap);
     }
 
     _createBooths() {
@@ -168,12 +284,16 @@ class ThemePark {
         interior.position.copy(data.position);
 
         if (data.previewImage) {
-            const preview = this._createPreviewPlane(data.previewImage, 3.1, 2.35, {
-                y: 1.16,
+            const previewSize = this._getPreviewSize(data.previewImage);
+            const preview = this._createPreviewPlane(data.previewImage, previewSize.width, previewSize.height, {
+                y: 0.08,
                 z: 0,
                 rotateX: 0,
                 shadowOpacity: 0.18,
-                standing: true
+                standing: true,
+                depth: previewSize.depth,
+                accentColor: data.color,
+                roofColor: data.roofColor
             });
             interior.add(preview);
         }
@@ -193,13 +313,23 @@ class ThemePark {
         return this._previewTextureCache.get(path);
     }
 
+    _getPreviewSize(path) {
+        const sizes = {
+            'assets/relay-drawing.png': { width: 6.8, height: 3.95, depth: 3.8 },
+            'assets/fortune-cookie.png': { width: 6.2, height: 4.65, depth: 4.0 },
+            'assets/flipbook.jpeg': { width: 6.4, height: 4.28, depth: 3.9 }
+        };
+        return sizes[path] || { width: 6.4, height: 4.2, depth: 3.8 };
+    }
+
     _createPreviewPlane(path, width, height, options = {}) {
         const group = new THREE.Group();
         const texture = this._getPreviewTexture(path);
+        const depth = options.depth || Math.max(width * 0.55, 3.4);
 
         if (options.standing) {
             const groundShadow = new THREE.Mesh(
-                new THREE.PlaneGeometry(width * 0.78, height * 0.28),
+                new THREE.PlaneGeometry(width * 0.96, depth * 0.76),
                 new THREE.MeshBasicMaterial({
                     color: 0x1b3a20,
                     transparent: true,
@@ -207,8 +337,56 @@ class ThemePark {
                 })
             );
             groundShadow.rotation.x = -Math.PI / 2;
-            groundShadow.position.set(0, 0.03, 0.22);
+            groundShadow.position.set(0, 0.03, depth * 0.16);
             group.add(groundShadow);
+
+            const base = new THREE.Mesh(
+                new THREE.BoxGeometry(width * 1.02, 0.18, depth),
+                new THREE.MeshStandardMaterial({
+                    color: 0xeee8dd,
+                    roughness: 0.95,
+                    metalness: 0.0
+                })
+            );
+            base.position.set(0, 0.09, 0);
+            group.add(base);
+
+            const leftWall = new THREE.Mesh(
+                new THREE.BoxGeometry(0.16, height * 0.92, depth * 0.82),
+                new THREE.MeshStandardMaterial({
+                    color: 0xf7f2e8,
+                    roughness: 0.92,
+                    metalness: 0.0
+                })
+            );
+            leftWall.position.set(-width * 0.49, height * 0.46, -depth * 0.06);
+            group.add(leftWall);
+
+            const rightWall = leftWall.clone();
+            rightWall.position.x = width * 0.49;
+            group.add(rightWall);
+
+            const backWall = new THREE.Mesh(
+                new THREE.BoxGeometry(width * 0.98, height * 0.92, 0.16),
+                new THREE.MeshStandardMaterial({
+                    color: 0xf8f4ec,
+                    roughness: 0.92,
+                    metalness: 0.0
+                })
+            );
+            backWall.position.set(0, height * 0.46, -depth * 0.46);
+            group.add(backWall);
+
+            const fascia = new THREE.Mesh(
+                new THREE.BoxGeometry(width * 1.04, 0.24, 0.44),
+                new THREE.MeshStandardMaterial({
+                    color: options.roofColor || options.accentColor || 0x7b6cff,
+                    roughness: 0.55,
+                    metalness: 0.04
+                })
+            );
+            fascia.position.set(0, height * 0.95, depth * 0.18);
+            group.add(fascia);
         }
 
         const image = new THREE.Mesh(
@@ -221,15 +399,16 @@ class ThemePark {
                 side: THREE.DoubleSide
             })
         );
-        image.position.z = 0.01;
+
+        if (options.standing) {
+            image.position.set(0, height * 0.5 + 0.12, depth * 0.34);
+        } else {
+            image.position.z = 0.01;
+        }
         group.add(image);
 
         group.position.set(0, options.y || 0, options.z || 0);
         group.rotation.x = options.rotateX || 0;
-
-        if (options.standing) {
-            image.position.y = height * 0.08;
-        }
 
         return group;
     }
@@ -602,7 +781,7 @@ class ThemePark {
         document.getElementById('booth-close').addEventListener('click', () => this.closeBooth());
     }
 
-    getCamera() { return this.orthoCamera; }
+    getCamera() { return this.camera; }
 
     update(characterPos) {
         if (this.isBoothOpen) return;

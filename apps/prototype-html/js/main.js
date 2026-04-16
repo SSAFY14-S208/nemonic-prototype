@@ -108,12 +108,13 @@ class NemonicTourApp {
             this.nemonicScene.camera
         );
 
-        // 직교 카메라로 교체 (춘식이 스타일)
+        // 테마파크 전용 3인칭 카메라 사용
         this.activeCamera = this.themePark.getCamera();
 
         // 캐릭터 생성
         this.character = new CharacterController(this.nemonicScene.scene);
         this.character.group.position.set(0, 5.5, 12);
+        this.character.group.rotation.y = Math.PI;
         this.nemonicScene.scene.add(this.character.group);
         this.character.activate(this.activeCamera);
         this.character.enableClickMove(this.nemonicScene.renderer.domElement);
@@ -169,13 +170,17 @@ class NemonicTourApp {
         }
 
         if (this.activeCamera) {
-            this.activeCamera.position.set(0, 21, 17);
-            this.activeCamera.lookAt(0, 4.5, 12);
+            const settle = this.character ? this.character._getCameraTargets() : null;
+            if (settle) {
+                this.activeCamera.position.copy(settle.position).add(new THREE.Vector3(0, 1.6, 2.6));
+                this.activeCamera.lookAt(settle.lookAt);
+            }
         }
 
         gsap.timeline({
             onComplete: () => {
                 if (this.character) {
+                    this.character._snapCamera();
                     this.character.isActive = true;
                 }
                 Utils.hide('whiteout');
@@ -204,15 +209,13 @@ class NemonicTourApp {
             }, 0.18)
             .to(this.activeCamera.position, {
                 duration: 1.0,
-                y: 15,
-                z: 12,
+                x: this.character._getCameraTargets().position.x,
+                y: this.character._getCameraTargets().position.y,
+                z: this.character._getCameraTargets().position.z,
                 ease: 'power2.out',
                 onUpdate: () => {
-                    this.activeCamera.lookAt(
-                        this.character.group.position.x,
-                        this.character.group.position.y + 1.2,
-                        this.character.group.position.z
-                    );
+                    const target = this.character._getCameraTargets();
+                    this.activeCamera.lookAt(target.lookAt);
                 }
             }, 0.18);
     }
