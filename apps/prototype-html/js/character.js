@@ -6,10 +6,11 @@ class CharacterController {
         this.moveSpeed = 5;
         this.isActive = false;
         this.camera = null;
-        this.moveAccelerationKeyboard = 18;
+        this.moveAccelerationKeyboard = 24;
         this.moveAccelerationClick = 11;
-        this.moveDeceleration = 14;
-        this.turnResponsiveness = 14;
+        this.moveDeceleration = 18;
+        this.turnResponsiveness = 18;
+        this.reverseBrakeStrength = 20;
         this.minMoveSpeed = 0.05;
 
         // 클릭 이동
@@ -25,10 +26,12 @@ class CharacterController {
         this.cameraLookAhead = 2.8;
         this.cameraLookAheadBoost = 0.9;
         this.cameraLerpIdle = 0.1;
-        this.cameraLerpMoving = 0.18;
+        this.cameraLerpMoving = 0.2;
         this.turnLerp = 0.24;
         this.inputDeadZone = 0.14;
         this.inputCurveExponent = 1.25;
+        this.manualInputRise = 20;
+        this.manualInputFall = 14;
 
         // 바닥 레이캐스팅용
         this.raycaster = new THREE.Raycaster();
@@ -50,6 +53,8 @@ class CharacterController {
 
         // 모바일 조이스틱
         this.joystickInput = { x: 0, y: 0 };
+        this.manualInput = new THREE.Vector2();
+        this.smoothedManualInput = new THREE.Vector2();
         // 키보드도 보조로 지원
         this.keys = {};
         this.baseY = 0;
@@ -565,6 +570,7 @@ class CharacterController {
         let desiredMoveDir = null;
         let desiredSpeed = 0;
         let movementMode = 'idle';
+        let facingDir = null;
 
         // --- 1. 클릭 이동 ---
         if (this.isMoving && this.targetPos) {
@@ -599,16 +605,27 @@ class CharacterController {
         if (Math.abs(this.joystickInput.x) > 0.15) inputX = this.joystickInput.x;
         if (Math.abs(this.joystickInput.y) > 0.15) inputForward = -this.joystickInput.y;
 
-        if (inputX !== 0 || inputForward !== 0) {
+        this.manualInput.set(inputX, inputForward);
+        if (this.manualInput.lengthSq() > 1) {
+            this.manualInput.normalize();
+        }
+        const inputBlend = 1 - Math.exp(-(this.manualInput.lengthSq() > 0 ? this.manualInputRise : this.manualInputFall) * dt);
+        this.smoothedManualInput.lerp(this.manualInput, inputBlend);
+        if (this.smoothedManualInput.lengthSq() < 0.0004) {
+            this.smoothedManualInput.set(0, 0);
+        }
+
+        if (this.smoothedManualInput.lengthSq() > 0) {
             // 키보드 입력 시 클릭 이동 취소
             this.isMoving = false;
             this.targetPos = null;
             this.clickMarker.visible = false;
 
-            const inputMagnitude = Math.min(1, Math.hypot(inputX, inputForward));
-            desiredMoveDir = this._getMoveDirectionFromInput(inputX, inputForward);
-            desiredSpeed = this.moveSpeed * Math.max(0.4, inputMagnitude);
+            const inputMagnitude = Math.min(1, this.smoothedManualInput.length());
+            desiredMoveDir = this._getMoveDirectionFromInput(this.smoothedManualInput.x, this.smoothedManualInput.y);
+            desiredSpeed = this.moveSpeed * (0.45 + inputMagnitude * 0.55);
             movementMode = 'manual';
+            facingDir = desiredMoveDir.clone();
         }
 
         const desiredVelocity = desiredMoveDir
@@ -619,7 +636,18 @@ class CharacterController {
             : movementMode === 'click'
                 ? this.moveAccelerationClick
                 : this.moveDeceleration;
-        const velocityLerp = 1 - Math.exp(-acceleration * dt);
+        let velocityLerp = 1 - Math.exp(-acceleration * dt);
+        if (movementMode === 'manual' && desiredMoveDir && this.velocity.lengthSq() > 0.01) {
+            const currentDir = this.velocity.clone().normalize();
+            const turnDot = currentDir.dot(desiredMoveDir);
+            if (turnDot < 0.35) {
+                const brakeBoost = (0.35 - turnDot) / 1.35;
+                velocityLerp = Math.max(
+                    velocityLerp,
+                    1 - Math.exp(-(acceleration + brakeBoost * this.reverseBrakeStrength) * dt)
+                );
+            }
+        }
         this.velocity.lerp(desiredVelocity, velocityLerp);
         this.velocity.y = 0; // Y축 이동 방지
         if (!desiredMoveDir && this.velocity.lengthSq() < this.minMoveSpeed * this.minMoveSpeed) {
@@ -632,13 +660,17 @@ class CharacterController {
         const planarSpeed = Math.hypot(this.velocity.x, this.velocity.z);
         const isWalking = planarSpeed > 0.18;
 
-        if (isWalking) {
-            const targetAngle = Math.atan2(this.velocity.x, this.velocity.z);
+        if (!facingDir && isWalking) {
+            facingDir = this.velocity.clone().normalize();
+        }
+
+        if (facingDir) {
+            const targetAngle = Math.atan2(facingDir.x, facingDir.z);
             let diff = targetAngle - this.group.rotation.y;
             while (diff > Math.PI) diff -= Math.PI * 2;
             while (diff < -Math.PI) diff += Math.PI * 2;
             const speedRatio = Math.min(1, planarSpeed / this.moveSpeed);
-            const rotationLerp = 1 - Math.exp(-(this.turnResponsiveness + speedRatio * 4) * dt);
+            const rotationLerp = 1 - Math.exp(-(this.turnResponsiveness + speedRatio * 5) * dt);
             this.group.rotation.y += diff * rotationLerp;
         }
 
@@ -783,6 +815,8 @@ class CharacterController {
         this.keys = {};
         this.joystickInput.x = 0;
         this.joystickInput.y = 0;
+        this.manualInput.set(0, 0);
+        this.smoothedManualInput.set(0, 0);
         this.velocity.set(0, 0, 0);
         const stick = document.querySelector('.joystick-stick');
         if (stick) stick.style.transform = '';
