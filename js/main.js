@@ -100,6 +100,10 @@ class NemonicTourApp {
         // 기존 인트로 씬 정리
         this._clearIntroScene();
 
+        // 렌더러 톤매핑 조정 (테마파크용 — 두두타 스타일)
+        this.nemonicScene.renderer.toneMapping = THREE.LinearToneMapping;
+        this.nemonicScene.renderer.toneMappingExposure = 1.0;
+
         // 테마파크 생성
         this.themePark = new ThemePark(
             this.nemonicScene.scene,
@@ -140,20 +144,12 @@ class NemonicTourApp {
 
     _clearIntroScene() {
         const scene = this.nemonicScene.scene;
+        // 인트로 씬 오브젝트 + 조명 전부 제거 (테마파크가 자체 조명 사용)
         const toRemove = [];
-        scene.traverse(obj => {
-            if (obj === scene) return;
-            // 조명은 유지, 나머지 전부 제거
-            if (!(obj instanceof THREE.Light) && obj.parent === scene) {
-                toRemove.push(obj);
-            }
+        scene.children.forEach(obj => {
+            toRemove.push(obj);
         });
         toRemove.forEach(obj => scene.remove(obj));
-
-        // 기본 조명만 남기고 SpotLight 제거
-        const spots = [];
-        scene.children.forEach(c => { if (c instanceof THREE.SpotLight) spots.push(c); });
-        spots.forEach(s => scene.remove(s));
     }
 
     addParticleSystem(ps) {

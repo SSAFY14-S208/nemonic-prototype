@@ -17,14 +17,14 @@ class NemonicScene {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         this.renderer.shadowMap.enabled = false;
-        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 1.5;
+        this.renderer.toneMapping = THREE.LinearToneMapping;
+        this.renderer.toneMappingExposure = 0.85;
         this.renderer.localClippingEnabled = true;
         document.getElementById('canvas-container').appendChild(this.renderer.domElement);
 
-        // 배경 (진한 맑은 하늘)
-        this.scene.background = new THREE.Color(0x4DB8E8);
-        this.scene.fog = new THREE.Fog(0x4DB8E8, 30, 80);
+        // 배경 (두두타 스타일 맑은 하늘)
+        this.scene.background = new THREE.Color(0x6EC8F0);
+        this.scene.fog = new THREE.Fog(0x6EC8F0, 40, 100);
 
         // 조명
         this._setupLights();
@@ -63,12 +63,12 @@ class NemonicScene {
     }
 
     _setupLights() {
-        // 앰비언트 (밝은 야외)
-        const ambient = new THREE.AmbientLight(0xffffff, 0.8);
+        // 앰비언트 (따뜻한 톤)
+        const ambient = new THREE.AmbientLight(0xfff8f0, 0.6);
         this.scene.add(ambient);
 
-        // 메인 디렉셔널 (햇빛)
-        const dirLight = new THREE.DirectionalLight(0xfff5e6, 1.2);
+        // 메인 디렉셔널 (따뜻한 햇빛)
+        const dirLight = new THREE.DirectionalLight(0xfff5e6, 0.8);
         dirLight.position.set(5, 10, 5);
         dirLight.castShadow = false;
         this.scene.add(dirLight);
@@ -80,17 +80,68 @@ class NemonicScene {
         this.scene.add(spot);
         this.scene.add(spot.target);
 
-        // 보조 포인트 라이트 (밝은 톤)
-        const fillLight = new THREE.PointLight(0xffffff, 0.3, 15);
+        // 보조 포인트 라이트
+        const fillLight = new THREE.PointLight(0xfff8f0, 0.3, 15);
         fillLight.position.set(-3, 3, 0);
         this.scene.add(fillLight);
     }
 
     _createFloor() {
-        // 잔디 바닥
+        // 두두타 스타일 잔디밭 텍스처
+        const c = document.createElement('canvas');
+        c.width = 512; c.height = 512;
+        const ctx = c.getContext('2d');
+
+        // 기본 잔디색 (차분한 자연 녹색)
+        ctx.fillStyle = '#5a9a50';
+        ctx.fillRect(0, 0, 512, 512);
+
+        // 어두운 패치
+        for (let i = 0; i < 40; i++) {
+            ctx.fillStyle = `rgba(55, 100, 45, ${0.12 + Math.random() * 0.12})`;
+            ctx.beginPath();
+            ctx.ellipse(
+                Math.random() * 512, Math.random() * 512,
+                20 + Math.random() * 40, 15 + Math.random() * 30,
+                Math.random() * Math.PI, 0, Math.PI * 2
+            );
+            ctx.fill();
+        }
+
+        // 밝은 패치
+        for (let i = 0; i < 30; i++) {
+            ctx.fillStyle = `rgba(110, 170, 80, ${0.08 + Math.random() * 0.1})`;
+            ctx.beginPath();
+            ctx.ellipse(
+                Math.random() * 512, Math.random() * 512,
+                15 + Math.random() * 35, 10 + Math.random() * 25,
+                Math.random() * Math.PI, 0, Math.PI * 2
+            );
+            ctx.fill();
+        }
+
+        // 잔디 잎 패턴
+        const grassColors = ['#4a8840', '#6aaa58', '#528e48', '#72b260', '#3e7a35'];
+        for (let i = 0; i < 2000; i++) {
+            const x = Math.random() * 512;
+            const y = Math.random() * 512;
+            const h = 3 + Math.random() * 6;
+            ctx.strokeStyle = grassColors[Math.floor(Math.random() * grassColors.length)];
+            ctx.lineWidth = 1 + Math.random() * 1.5;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + (Math.random() - 0.5) * 3, y - h);
+            ctx.stroke();
+        }
+
+        const tex = new THREE.CanvasTexture(c);
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(6, 6);
+        tex.anisotropy = 4;
+
         const floorGeo = new THREE.PlaneGeometry(50, 50);
         const floorMat = new THREE.MeshStandardMaterial({
-            color: 0x2E8B57,
+            map: tex,
             roughness: 0.9,
             metalness: 0.0
         });
@@ -110,8 +161,8 @@ class NemonicScene {
         for (let i = 0; i < pathPoints.length; i++) {
             const tileGeo = new THREE.PlaneGeometry(0.8, 0.5);
             const tileMat = new THREE.MeshStandardMaterial({
-                color: 0xC4A070,
-                roughness: 0.85,
+                color: 0xD4A868,
+                roughness: 0.7,
                 metalness: 0.0
             });
             const tile = new THREE.Mesh(tileGeo, tileMat);
@@ -135,9 +186,9 @@ class NemonicScene {
         cloudGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         const cloudMat = new THREE.PointsMaterial({
             color: 0xffffff,
-            size: 0.15,
+            size: 0.25,
             transparent: true,
-            opacity: 0.5
+            opacity: 0.7
         });
         this.stars = new THREE.Points(cloudGeo, cloudMat);
         this.scene.add(this.stars);
@@ -159,8 +210,8 @@ class NemonicScene {
                 const lampMat = new THREE.MeshStandardMaterial({
                     color: side > 0 ? 0xFFD700 : 0xFF9800,
                     emissive: side > 0 ? 0xFFD700 : 0xFF9800,
-                    emissiveIntensity: 0.3,
-                    roughness: 0.4
+                    emissiveIntensity: 0.5,
+                    roughness: 0.3
                 });
                 const lamp = new THREE.Mesh(lampGeo, lampMat);
                 lamp.position.set(side * 2.5, 2.6, 6 - i * 3);
@@ -171,7 +222,7 @@ class NemonicScene {
         // 꽃 장식 (기기 주변에서 충분히 먼 곳에만)
         const flowerColors = [0xFF69B4, 0xFFEB3B, 0xFF5722, 0x9C27B0, 0xE91E63];
         for (let i = 0; i < 25; i++) {
-            const fGeo = new THREE.SphereGeometry(0.05, 6, 6);
+            const fGeo = new THREE.SphereGeometry(0.08, 8, 8);
             const fMat = new THREE.MeshStandardMaterial({
                 color: flowerColors[Math.floor(Math.random() * flowerColors.length)],
                 roughness: 0.8

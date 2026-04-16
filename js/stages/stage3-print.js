@@ -78,8 +78,9 @@ class Stage3Print {
     _animatePrinting(memo) {
         return new Promise(resolve => {
             const tl = gsap.timeline({ onComplete: resolve });
-            // 클리핑으로 아래서 위로 뽑혀 올라옴
-            tl.to(memo.position, { duration: 2.2, y: memo.position.y + 0.85, ease: 'none' })
+            // 클리핑으로 아래서 위로 뽑혀 올라옴 (실제 네모닉처럼 뒤로 기울어지며)
+            tl.to(memo.position, { duration: 2.2, y: memo.position.y + 0.85, z: memo.position.z - 0.35, ease: 'none' })
+              .to(memo.rotation, { duration: 2.2, x: -0.75, ease: 'power1.in' }, 0) // 올라오면서 점점 더 뒤로 기울어짐
               .to(memo.position, { duration: 0.04, x: '+=0.002', repeat: 50, yoyo: true, ease: 'none' }, 0);
         });
     }
@@ -95,13 +96,14 @@ class Stage3Print {
         device.group.remove(memo);
         this.scene.scene.add(memo);
         memo.position.copy(worldPos);
-        memo.rotation.set(-0.25, 0, 0);
+        memo.rotation.set(-0.75, 0, 0);
 
         // 클리핑 해제 - 새 material로 교체 (확실하게)
         const oldTex = memo.material.map;
         memo.material.dispose();
         memo.material = new THREE.MeshStandardMaterial({
             map: oldTex,
+            color: 0xe8e4d8,
             side: THREE.DoubleSide,
             roughness: 0.92,
             metalness: 0.0

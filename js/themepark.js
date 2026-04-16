@@ -14,7 +14,7 @@ class ThemePark {
 
     _createOrthoCamera() {
         const aspect = window.innerWidth / window.innerHeight;
-        const fs = 14;
+        const fs = 24;
         const cam = new THREE.OrthographicCamera(-fs*aspect/2, fs*aspect/2, fs/2, -fs/2, 0.1, 100);
         cam.position.set(0, 15, 12);
         cam.lookAt(0, 0, 0);
@@ -28,14 +28,21 @@ class ThemePark {
     }
 
     _build() {
-        this.threeScene.background = new THREE.Color(0xf5f3ef);
+        this.threeScene.background = new THREE.Color(0x88D4F4);
         this.threeScene.fog = null;
 
-        // 조명 (최소한)
-        this.group.add(new THREE.AmbientLight(0xffffff, 0.85));
-        const dir = new THREE.DirectionalLight(0xfff5e0, 0.5);
-        dir.position.set(5, 10, 5);
+        // 렌더러 톤매핑 리셋 (인트로와 다르게 설정)
+        const renderer = this.threeScene.getObjectByProperty && null;
+        // 렌더러는 외부에서 접근 — _build 후 main.js에서 처리
+
+        // 조명 (두두타 스타일: 따뜻하고 자연스러움)
+        this.group.add(new THREE.AmbientLight(0xfff5e6, 0.7));
+        const dir = new THREE.DirectionalLight(0xfff0dd, 0.8);
+        dir.position.set(5, 12, 5);
         this.group.add(dir);
+        const fillDir = new THREE.DirectionalLight(0xe8eeff, 0.25);
+        fillDir.position.set(-5, 8, -3);
+        this.group.add(fillDir);
 
         this._createTileFloor();
         this._createRoads();
@@ -46,31 +53,68 @@ class ThemePark {
     }
 
     _createTileFloor() {
+        // 두두타 스타일 잔디밭
         const c = document.createElement('canvas');
-        c.width = 256; c.height = 256;
+        c.width = 512; c.height = 512;
         const ctx = c.getContext('2d');
-        ctx.fillStyle = '#f5f3ef';
-        ctx.fillRect(0, 0, 256, 256);
-        ctx.strokeStyle = '#e0ddd8';
-        ctx.lineWidth = 1;
-        for (let i = 0; i <= 16; i++) {
-            const p = i * 16;
-            ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, 256); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(256, p); ctx.stroke();
+
+        // 기본 잔디색 (차분한 자연 녹색)
+        ctx.fillStyle = '#5a9a50';
+        ctx.fillRect(0, 0, 512, 512);
+
+        // 어두운 패치
+        for (let i = 0; i < 40; i++) {
+            ctx.fillStyle = `rgba(55, 100, 45, ${0.12 + Math.random() * 0.12})`;
+            ctx.beginPath();
+            ctx.ellipse(
+                Math.random() * 512, Math.random() * 512,
+                20 + Math.random() * 40, 15 + Math.random() * 30,
+                Math.random() * Math.PI, 0, Math.PI * 2
+            );
+            ctx.fill();
         }
+
+        // 밝은 패치
+        for (let i = 0; i < 30; i++) {
+            ctx.fillStyle = `rgba(110, 170, 80, ${0.08 + Math.random() * 0.1})`;
+            ctx.beginPath();
+            ctx.ellipse(
+                Math.random() * 512, Math.random() * 512,
+                15 + Math.random() * 35, 10 + Math.random() * 25,
+                Math.random() * Math.PI, 0, Math.PI * 2
+            );
+            ctx.fill();
+        }
+
+        // 잔디 잎 패턴
+        const grassColors = ['#4a8840', '#6aaa58', '#528e48', '#72b260', '#3e7a35'];
+        for (let i = 0; i < 2000; i++) {
+            const x = Math.random() * 512;
+            const y = Math.random() * 512;
+            const h = 3 + Math.random() * 6;
+            ctx.strokeStyle = grassColors[Math.floor(Math.random() * grassColors.length)];
+            ctx.lineWidth = 1 + Math.random() * 1.5;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + (Math.random() - 0.5) * 3, y - h);
+            ctx.stroke();
+        }
+
         const tex = new THREE.CanvasTexture(c);
         tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
         tex.repeat.set(6, 6);
+        tex.anisotropy = 4;
+
         const floor = new THREE.Mesh(
             new THREE.PlaneGeometry(50, 50),
-            new THREE.MeshStandardMaterial({ map: tex, roughness: 1 })
+            new THREE.MeshBasicMaterial({ map: tex })
         );
         floor.rotation.x = -Math.PI / 2;
         this.group.add(floor);
     }
 
     _createRoads() {
-        const mat = new THREE.MeshStandardMaterial({ color: 0xf5e6c8, roughness: 0.9 });
+        const mat = new THREE.MeshStandardMaterial({ color: 0xd8c8a8, roughness: 0.8 });
         const r1 = new THREE.Mesh(new THREE.PlaneGeometry(3, 30), mat);
         r1.rotation.x = -Math.PI / 2; r1.position.y = 0.01;
         this.group.add(r1);
@@ -81,23 +125,23 @@ class ThemePark {
 
     _createBooths() {
         const boothData = [
-            { name: '춘식이네 집', icon: '🏠', color: 0xff6b6b, roofColor: 0xff4757,
+            { name: '춘식이네 집', icon: '🏠', color: 0xff4040, roofColor: 0xe52525,
               position: new THREE.Vector3(-7, 0, -6), gameType: 'yang',
               desc: '아늑한 거실에서 양세찬 게임을 즐겨보세요!', action: '게임 시작',
               theme: 'home' },
-            { name: '망고 오피스', icon: '🏢', color: 0x54a0ff, roofColor: 0x2e86de,
+            { name: '망고 오피스', icon: '🏢', color: 0x2196F3, roofColor: 0x1565C0,
               position: new THREE.Vector3(7, 0, -6), gameType: null,
               desc: '망고슬래브 사무실에서 오늘의 운세를 확인하세요!', action: '운세 보기',
               theme: 'office' },
-            { name: '네모닉 볼링장', icon: '🎳', color: 0xa55eea, roofColor: 0x8854d0,
+            { name: '네모닉 볼링장', icon: '🎳', color: 0x9C27B0, roofColor: 0x7B1FA2,
               position: new THREE.Vector3(-7, 0, 4), gameType: null,
               desc: '오답노트를 만들어 실력을 키워보세요!', action: '사진 업로드',
               theme: 'bowling' },
-            { name: '네모 PC방', icon: '🖥️', color: 0xfeca57, roofColor: 0xf9a825,
+            { name: '네모 PC방', icon: '🖥️', color: 0xFFB300, roofColor: 0xF57F17,
               position: new THREE.Vector3(7, 0, 4), gameType: null,
               desc: 'AI로 나만의 커스텀 스티커를 만들어보세요!', action: '스티커 만들기',
               theme: 'pcroom' },
-            { name: '메모 카페', icon: '☕', color: 0x1dd1a1, roofColor: 0x10ac84,
+            { name: '메모 카페', icon: '☕', color: 0x00C853, roofColor: 0x00962e,
               position: new THREE.Vector3(0, 0, -9), gameType: null,
               desc: '따뜻한 카페에서 자유 메모를 작성하세요.', action: '메모 작성',
               theme: 'cafe' }
@@ -121,7 +165,7 @@ class ThemePark {
         const shell = new THREE.Group();
         shell.position.copy(data.position);
 
-        const floorC = { home: 0xe8d0a8, office: 0xd8dce0, bowling: 0xd4b888, pcroom: 0x3d3d5c, cafe: 0xd4b888 };
+        const floorC = { home: 0xd4b888, office: 0xc0c8d4, bowling: 0xc4a070, pcroom: 0x2d2d4a, cafe: 0xc4a070 };
         const floorMesh = new THREE.Mesh(
             new THREE.PlaneGeometry(S, S),
             new THREE.MeshStandardMaterial({ color: floorC[data.theme] || 0xf0e6d3, roughness: 0.9 })
@@ -149,7 +193,7 @@ class ThemePark {
         const interior = new THREE.Group();
         interior.position.copy(data.position);
 
-        const wallC = { home: 0xfce4c0, office: 0xd0d8e8, bowling: 0xeee0c8, pcroom: 0x2a2a4a, cafe: 0xf0e0c8 };
+        const wallC = { home: 0xecd0a0, office: 0xb8c0d8, bowling: 0xddd0a8, pcroom: 0x222240, cafe: 0xe0d0a8 };
         const wallMat = new THREE.MeshStandardMaterial({ color: wallC[data.theme] || 0xfff8f0, roughness: 0.8, side: THREE.DoubleSide });
 
         // 뒷벽
@@ -539,10 +583,10 @@ class ThemePark {
         const leafGeo = new THREE.SphereGeometry(0.7, 8, 6);
         treePos.forEach(([x, z]) => {
             const tree = new THREE.Group();
-            const trunk = new THREE.Mesh(trunkGeo, new THREE.MeshStandardMaterial({ color: 0xc4956a }));
+            const trunk = new THREE.Mesh(trunkGeo, new THREE.MeshStandardMaterial({ color: 0x8D6E63 }));
             trunk.position.y = 0.5;
             tree.add(trunk);
-            const colors = [0x5cb85c, 0x7dd87d, 0x48a868];
+            const colors = [0x4A8B4A, 0x5AA05A, 0x3A7A3A];
             const leaf = new THREE.Mesh(leafGeo, new THREE.MeshStandardMaterial({ color: colors[Math.floor(Math.random()*3)] }));
             leaf.position.y = 1.5;
             leaf.scale.set(1, 0.85, 1);
@@ -573,7 +617,7 @@ class ThemePark {
             this.group.add(p);
         });
         const top = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.5, 0.4),
-            new THREE.MeshStandardMaterial({ color: 0x6366f1 }));
+            new THREE.MeshStandardMaterial({ color: 0x3525B0, roughness: 0.4 }));
         top.position.set(0, 3.6, 12);
         this.group.add(top);
         const tc = document.createElement('canvas');

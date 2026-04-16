@@ -38,11 +38,11 @@ class Stage2Drawing {
         this.canvas.style.height = size + 'px';
 
         // 기본 배경
-        this.ctx.fillStyle = '#fffde7';
+        this.ctx.fillStyle = '#f7f5ed';
         this.ctx.fillRect(0, 0, size, size);
 
         // 가이드 텍스트 (배경색과 거의 같게 - 출력물에 안 보이도록)
-        this.ctx.fillStyle = 'rgba(255,253,231,0.7)';
+        this.ctx.fillStyle = 'rgba(247,245,237,0.78)';
         this.ctx.font = `${size * 0.06}px "Apple SD Gothic Neo", sans-serif`;
         this.ctx.textAlign = 'center';
         this.ctx.fillText('여기에 문을 그려주세요', size / 2, size / 2);
