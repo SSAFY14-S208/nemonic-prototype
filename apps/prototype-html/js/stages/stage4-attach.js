@@ -42,18 +42,49 @@ class Stage4Attach {
                     return (Math.abs(src[i] - 255) + Math.abs(src[i + 1] - 253) + Math.abs(src[i + 2] - 231)) > 50;
                 };
 
+                const lineMask = new Uint8Array(W * H);
+                let lineMinX = W, lineMinY = H, lineMaxX = 0, lineMaxY = 0, lineCount = 0;
+                for (let y = 0; y < H; y++) {
+                    for (let x = 0; x < W; x++) {
+                        if (!isLine(x, y)) continue;
+                        const idx = y * W + x;
+                        lineMask[idx] = 1;
+                        lineCount++;
+                        if (x < lineMinX) lineMinX = x;
+                        if (x > lineMaxX) lineMaxX = x;
+                        if (y < lineMinY) lineMinY = y;
+                        if (y > lineMaxY) lineMaxY = y;
+                    }
+                }
+
+                const sealedMask = new Uint8Array(W * H);
+                const sealRadius = 2;
+                for (let y = 0; y < H; y++) {
+                    for (let x = 0; x < W; x++) {
+                        if (!lineMask[y * W + x]) continue;
+                        for (let oy = -sealRadius; oy <= sealRadius; oy++) {
+                            for (let ox = -sealRadius; ox <= sealRadius; ox++) {
+                                const nx = x + ox;
+                                const ny = y + oy;
+                                if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
+                                sealedMask[ny * W + nx] = 1;
+                            }
+                        }
+                    }
+                }
+
                 const outside = new Uint8Array(W * H);
                 const queue = [];
                 for (let x = 0; x < W; x++) {
-                    if (!isLine(x, 0)) { outside[x] = 1; queue.push(x); }
+                    if (!sealedMask[x]) { outside[x] = 1; queue.push(x); }
                     const bottom = (H - 1) * W + x;
-                    if (!isLine(x, H - 1)) { outside[bottom] = 1; queue.push(bottom); }
+                    if (!sealedMask[bottom]) { outside[bottom] = 1; queue.push(bottom); }
                 }
                 for (let y = 1; y < H - 1; y++) {
                     const left = y * W;
                     const right = y * W + (W - 1);
-                    if (!isLine(0, y)) { outside[left] = 1; queue.push(left); }
-                    if (!isLine(W - 1, y)) { outside[right] = 1; queue.push(right); }
+                    if (!sealedMask[left]) { outside[left] = 1; queue.push(left); }
+                    if (!sealedMask[right]) { outside[right] = 1; queue.push(right); }
                 }
 
                 let head = 0;
@@ -65,7 +96,7 @@ class Stage4Attach {
                         if (next < 0 || next >= W * H || outside[next]) continue;
                         const nx = next % W;
                         const ny = (next - nx) / W;
-                        if (!isLine(nx, ny)) {
+                        if (!sealedMask[next]) {
                             outside[next] = 1;
                             queue.push(next);
                         }
@@ -145,9 +176,24 @@ class Stage4Attach {
                 }
 
                 const significant = components.filter((component) => component.area > Math.max(60, W * H * 0.002));
-                const activeComponent = (significant.length ? significant : components)
+                let activeComponent = (significant.length ? significant : components)
                     .slice()
                     .sort((a, b) => b.area - a.area)[0];
+
+                if (!activeComponent && lineCount > 0) {
+                    const padX = Math.max(3, Math.round((lineMaxX - lineMinX) * 0.08));
+                    const padY = Math.max(3, Math.round((lineMaxY - lineMinY) * 0.08));
+                    activeComponent = {
+                        minX: Math.max(0, lineMinX + padX),
+                        minY: Math.max(0, lineMinY + padY),
+                        maxX: Math.min(W - 1, lineMaxX - padX),
+                        maxY: Math.min(H - 1, lineMaxY - padY),
+                        cx: (lineMinX + lineMaxX) / 2,
+                        cy: (lineMinY + lineMaxY) / 2,
+                        area: Math.max(1, (lineMaxX - lineMinX) * (lineMaxY - lineMinY) * 0.45),
+                        fallback: true
+                    };
+                }
 
                 const dp = this._doorPos;
                 const memoW = 0.85 * memo.scale.x;
@@ -172,7 +218,22 @@ class Stage4Attach {
                     canvas.height = H;
                     const ctx = canvas.getContext('2d');
                     const data = ctx.createImageData(W, H);
-                    if (component) {
+                    if (component?.fallback) {
+                        const innerW = Math.max(8, component.maxX - component.minX);
+                        const innerH = Math.max(8, component.maxY - component.minY);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.beginPath();
+                        ctx.ellipse(
+                            (component.minX + component.maxX) / 2,
+                            (component.minY + component.maxY) / 2,
+                            innerW * 0.46,
+                            innerH * 0.46,
+                            0,
+                            0,
+                            Math.PI * 2
+                        );
+                        ctx.fill();
+                    } else if (component) {
                         component.pixels.forEach((idx) => {
                             const i4 = idx * 4;
                             data.data[i4] = 255;
